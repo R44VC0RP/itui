@@ -1,4 +1,4 @@
-import { useKeyboard, useTerminalDimensions } from "@opentui/react";
+import { useKeyboard, useRenderer, useTerminalDimensions } from "@opentui/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Composer } from "./components/Composer.tsx";
 import { ConversationView } from "./components/ConversationView.tsx";
@@ -100,8 +100,20 @@ export function App({ config }: { config: Config }) {
     });
   }, [selected?.id]);
 
-  // Terminal focus tracking. Detected inside useKeyboard since OpenTUI owns stdin.
+  // Terminal focus tracking via OpenTUI's renderer events. The renderer listens for
+  // the terminal's focus reporting sequences internally and emits "focus" / "blur".
+  const renderer = useRenderer();
   const terminalFocusedRef = useRef(true);
+  useEffect(() => {
+    const onFocus = () => { terminalFocusedRef.current = true; };
+    const onBlur = () => { terminalFocusedRef.current = false; };
+    renderer.on("focus", onFocus);
+    renderer.on("blur", onBlur);
+    return () => {
+      renderer.off("focus", onFocus);
+      renderer.off("blur", onBlur);
+    };
+  }, [renderer]);
 
   // SSE subscription. Single long-lived stream across all chats.
   const selectedChatIdRef = useRef<number | null>(null);
@@ -179,19 +191,6 @@ export function App({ config }: { config: Config }) {
   // ----- Keyboard -----
 
   useKeyboard((key) => {
-    // Terminal focus reporting: OpenTUI enables \x1b[?1004h, so the terminal sends
-    // \x1b[I (focus in) and \x1b[O (focus out) as key events. Detect them here
-    // since OpenTUI owns stdin and external listeners can't see these sequences.
-    const seq = key.sequence ?? "";
-    if (seq.includes("\x1b[I") || key.name === "focus") {
-      terminalFocusedRef.current = true;
-      return;
-    }
-    if (seq.includes("\x1b[O") || key.name === "blur") {
-      terminalFocusedRef.current = false;
-      return;
-    }
-
     // Ctrl+Shift+N: test notification (debug). Fires a fake notification so you can
     // confirm notify-send / osascript works without waiting for a real message.
     if (key.ctrl && key.shift && key.name === "n") {
