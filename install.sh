@@ -172,7 +172,10 @@ if [[ ! -f "$CONFIG_DIR/config.json" ]]; then
   "server": "http://127.0.0.1:8080",
   "token": null,
   "defaultChatId": null,
-  "reconnectDelayMs": 2000
+  "reconnectDelayMs": 2000,
+  "hideHandles": true,
+  "notifications": true,
+  "notificationSound": true
 }
 CONFIG
   info "Created config at $CONFIG_DIR/config.json"

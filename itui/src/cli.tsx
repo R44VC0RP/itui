@@ -149,6 +149,13 @@ function applyConfigKey(patch: Partial<Config>, key: string, value: string): voi
     case "hide_handles":
       patch.hideHandles = value === "true" || value === "1";
       return;
+    case "notifications":
+      patch.notifications = value === "true" || value === "1";
+      return;
+    case "notificationSound":
+    case "notification_sound":
+      patch.notificationSound = value === "true" || value === "1";
+      return;
     default:
       process.stderr.write(`unknown config key: ${key}\n`);
       process.exit(1);

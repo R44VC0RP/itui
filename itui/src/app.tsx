@@ -8,6 +8,7 @@ import { ImsgClient, APIError } from "./api/client.ts";
 import { ImsgEventStream } from "./api/sse.ts";
 import type { ChatRow, Message } from "./api/types.ts";
 import type { Config } from "./config.ts";
+import { notifyNewMessage } from "./notify.ts";
 import { theme } from "./theme.ts";
 
 type Focus = "chats" | "messages" | "composer";
@@ -122,7 +123,16 @@ export function App({ config }: { config: Config }) {
           if (existing.some((x) => x.id === m.id)) return prev;
           return { ...prev, [m.chat_id]: [...existing, m] };
         });
-        setChats((prev) => reorderChat(prev, m));
+        setChats((prev) => {
+          const next = reorderChat(prev, m);
+          // Fire desktop notification for messages not in the active chat.
+          if (!m.is_from_me && selectedChatIdRef.current !== m.chat_id) {
+            const chat = next.find((c) => c.id === m.chat_id);
+            const chatName = chat?.name || chat?.participants_resolved?.[0]?.name || "";
+            notifyNewMessage(config, m, chatName);
+          }
+          return next;
+        });
         if (!m.is_from_me && selectedChatIdRef.current !== m.chat_id) {
           setUnread((prev) => {
             const next = new Set(prev);

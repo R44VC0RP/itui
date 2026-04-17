@@ -16,6 +16,14 @@ export interface Config {
    * header, message sender labels. Only resolved contact names are shown. Handles that
    * have no contact name are displayed as "Unknown". */
   hideHandles: boolean;
+  /** Desktop notifications for incoming messages. Works cross-platform:
+   *  - Omarchy / Linux: `notify-send` (freedesktop)
+   *  - macOS: `osascript` (Notification Center)
+   *  - Fallback: terminal BEL character */
+  notifications: boolean;
+  /** Play a sound with the notification. On Omarchy this uses freedesktop sound names
+   * via `canberra-gtk-play`; on macOS it uses the system notification sound. */
+  notificationSound: boolean;
 }
 
 export const DEFAULT_CONFIG: Config = {
@@ -24,6 +32,8 @@ export const DEFAULT_CONFIG: Config = {
   defaultChatId: null,
   reconnectDelayMs: 2000,
   hideHandles: true,
+  notifications: true,
+  notificationSound: true,
 };
 
 /**
