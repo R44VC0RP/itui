@@ -25,11 +25,13 @@ export function ConversationView({
   chat,
   messages,
   focused,
+  hideHandles,
   onFocusRequested,
 }: {
   chat: ChatRow | null;
   messages: Message[];
   focused: boolean;
+  hideHandles: boolean;
   onFocusRequested: () => void;
 }) {
   return (
@@ -41,11 +43,11 @@ export function ConversationView({
         borderStyle: "single",
         borderColor: focused ? theme.color.borderStrong : theme.color.border,
       }}
-      title={chat ? ` ${title(chat)} ` : " Messages "}
+      title={chat ? ` ${hideHandles ? displayName(chat) : title(chat)} ` : " Messages "}
       titleAlignment="center"
       onMouseDown={onFocusRequested}
     >
-      <Header chat={chat} />
+      <Header chat={chat} hideHandles={hideHandles} />
       {/* key={chat?.id} forces React to unmount/remount the scrollbox when the
           selected chat changes. A fresh scrollbox respects stickyStart="bottom"
           from the start, so history-heavy conversations open at the newest
@@ -76,6 +78,7 @@ export function ConversationView({
                 key={section.key}
                 group={section}
                 chat={chat}
+                hideHandles={hideHandles}
               />
             );
           })
@@ -85,7 +88,7 @@ export function ConversationView({
   );
 }
 
-function Header({ chat }: { chat: ChatRow | null }) {
+function Header({ chat, hideHandles }: { chat: ChatRow | null; hideHandles: boolean }) {
   if (!chat) {
     return (
       <box
@@ -103,9 +106,10 @@ function Header({ chat }: { chat: ChatRow | null }) {
     );
   }
   const primary = chat.participants_resolved?.[0];
-  const subtitle = chat.is_group
-    ? `${chat.participants.length} participants`
-    : chat.identifier;
+  const headerTitle = hideHandles ? displayName(chat) : title(chat);
+  const subtitle = hideHandles
+    ? (chat.is_group ? `${chat.participants.length} participants` : "")
+    : (chat.is_group ? `${chat.participants.length} participants` : chat.identifier);
   return (
     <box
       style={{
@@ -120,10 +124,14 @@ function Header({ chat }: { chat: ChatRow | null }) {
     >
       <Avatar contact={primary} handle={chat.identifier} size={3} />
       <text fg={theme.color.textStrong} attributes={1}>
-        {title(chat)}
+        {headerTitle}
       </text>
-      <text fg={theme.color.muted}>·</text>
-      <text fg={theme.color.muted}>{subtitle}</text>
+      {subtitle.length > 0 && (
+        <>
+          <text fg={theme.color.muted}>·</text>
+          <text fg={theme.color.muted}>{subtitle}</text>
+        </>
+      )}
     </box>
   );
 }
@@ -223,15 +231,16 @@ function buildSections(messages: Message[]): Section[] {
 function MessageGroup({
   group,
   chat,
+  hideHandles,
 }: {
   group: MessageGroupSection;
   chat: ChatRow | null;
+  hideHandles: boolean;
 }) {
   const firstMessage = group.messages[0]!;
 
   if (firstMessage.is_reaction) {
-    const who =
-      group.contact?.name || firstMessage.sender || "Someone";
+    const who = group.contact?.name || (hideHandles ? "Someone" : firstMessage.sender) || "Someone";
     const emoji = firstMessage.reaction_emoji ?? "•";
     const verb = firstMessage.is_reaction_add === false ? "removed" : "reacted";
     return (
@@ -246,7 +255,7 @@ function MessageGroup({
   const isMe = group.isFromMe;
   const bubbleBg = isMe ? theme.color.accent : theme.color.surface;
   const textColor = isMe ? theme.color.textStrong : theme.color.text;
-  const name = group.contact?.name || firstMessage.sender;
+  const name = group.contact?.name || (hideHandles ? "Unknown" : firstMessage.sender);
   const isGroup = chat?.is_group ?? false;
 
   return (
@@ -343,6 +352,15 @@ function title(chat: ChatRow): string {
     .map((p) => p.name || p.handle)
     .filter((v) => v.length > 0);
   return names.length > 0 ? names.join(", ") : chat.identifier;
+}
+
+/** Names only — handles replaced with "Unknown". */
+function displayName(chat: ChatRow): string {
+  if (chat.name && chat.name.length > 0) return chat.name;
+  const names = (chat.participants_resolved ?? [])
+    .map((p) => p.name || "Unknown")
+    .filter((v) => v.length > 0);
+  return names.length > 0 ? names.join(", ") : "Unknown";
 }
 
 function formatStamp(iso: string): string {

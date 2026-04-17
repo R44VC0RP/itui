@@ -18,6 +18,7 @@ export function Sidebar({
   selectedIndex,
   focused,
   unread,
+  hideHandles,
   onSelect,
   onFocusRequested,
 }: {
@@ -25,6 +26,7 @@ export function Sidebar({
   selectedIndex: number;
   focused: boolean;
   unread: Set<number>;
+  hideHandles: boolean;
   onSelect: (index: number) => void;
   onFocusRequested: () => void;
 }) {
@@ -58,6 +60,7 @@ export function Sidebar({
             selected={i === selectedIndex}
             focused={focused}
             unread={unread.has(chat.id)}
+            hideHandles={hideHandles}
             onClick={() => onSelect(i)}
           />
         ))}
@@ -71,12 +74,14 @@ function SidebarRow({
   selected,
   focused,
   unread,
+  hideHandles,
   onClick,
 }: {
   chat: ChatRow;
   selected: boolean;
   focused: boolean;
   unread: boolean;
+  hideHandles: boolean;
   onClick: () => void;
 }) {
   const bg = selected
@@ -85,7 +90,7 @@ function SidebarRow({
       : theme.color.surfaceHover
     : theme.color.surface;
 
-  const displayName = chatTitle(chat);
+  const displayName = hideHandles ? chatDisplayName(chat) : chatTitle(chat);
   const time = formatTime(chat.last_message_at);
 
   return (
@@ -124,6 +129,7 @@ function SidebarRow({
   );
 }
 
+/** Shows resolved names, falls back to handles when no name exists. */
 function chatTitle(chat: ChatRow): string {
   if (chat.name && chat.name.length > 0) return chat.name;
   const names = (chat.participants_resolved ?? [])
@@ -131,6 +137,16 @@ function chatTitle(chat: ChatRow): string {
     .filter((v) => v.length > 0);
   if (names.length > 0) return names.join(", ");
   return chat.identifier;
+}
+
+/** Shows only resolved names. Handles (phone/email) are replaced with "Unknown". */
+function chatDisplayName(chat: ChatRow): string {
+  if (chat.name && chat.name.length > 0) return chat.name;
+  const names = (chat.participants_resolved ?? [])
+    .map((p) => p.name || "Unknown")
+    .filter((v) => v.length > 0);
+  if (names.length > 0) return names.join(", ");
+  return "Unknown";
 }
 
 function truncate(value: string, max: number): string {

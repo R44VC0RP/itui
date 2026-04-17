@@ -12,6 +12,10 @@ export interface Config {
   defaultChatId: number | null;
   /** ms between SSE reconnect attempts when the server drops or errors. */
   reconnectDelayMs: number;
+  /** When true, phone numbers and emails are hidden everywhere — sidebar, conversation
+   * header, message sender labels. Only resolved contact names are shown. Handles that
+   * have no contact name are displayed as "Unknown". */
+  hideHandles: boolean;
 }
 
 export const DEFAULT_CONFIG: Config = {
@@ -19,6 +23,7 @@ export const DEFAULT_CONFIG: Config = {
   token: null,
   defaultChatId: null,
   reconnectDelayMs: 2000,
+  hideHandles: true,
 };
 
 /**

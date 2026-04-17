@@ -145,6 +145,10 @@ function applyConfigKey(patch: Partial<Config>, key: string, value: string): voi
       patch.reconnectDelayMs = n;
       return;
     }
+    case "hideHandles":
+    case "hide_handles":
+      patch.hideHandles = value === "true" || value === "1";
+      return;
     default:
       process.stderr.write(`unknown config key: ${key}\n`);
       process.exit(1);

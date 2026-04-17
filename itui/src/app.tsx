@@ -263,6 +263,7 @@ export function App({ config }: { config: Config }) {
           selectedIndex={selectedIndex}
           focused={focus === "chats"}
           unread={unread}
+          hideHandles={config.hideHandles}
           onSelect={selectChatByIndex}
           onFocusRequested={() => setFocus("chats")}
         />
@@ -271,6 +272,7 @@ export function App({ config }: { config: Config }) {
             chat={selected}
             messages={selectedMessages}
             focused={focus === "messages"}
+            hideHandles={config.hideHandles}
             onFocusRequested={() => setFocus("messages")}
           />
           <Composer
