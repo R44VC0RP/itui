@@ -100,6 +100,23 @@ export function App({ config }: { config: Config }) {
     });
   }, [selected?.id]);
 
+  // Terminal focus tracking. Modern terminals (Ghostty, Alacritty, Kitty, iTerm2)
+  // send \x1b[I (focus gained) and \x1b[O (focus lost) when focus reporting is
+  // enabled — OpenTUI already enables this via \x1b[?1004h. We listen on stdin
+  // for these sequences so we know whether the user is actually looking at itui.
+  // When unfocused, ALL incoming messages trigger a notification (even the active
+  // chat), because the user isn't seeing them.
+  const terminalFocusedRef = useRef(true);
+  useEffect(() => {
+    const onData = (data: Buffer) => {
+      const str = data.toString();
+      if (str.includes("\x1b[I")) terminalFocusedRef.current = true;
+      if (str.includes("\x1b[O")) terminalFocusedRef.current = false;
+    };
+    process.stdin.on("data", onData);
+    return () => { process.stdin.off("data", onData); };
+  }, []);
+
   // SSE subscription. Single long-lived stream across all chats.
   const selectedChatIdRef = useRef<number | null>(null);
   useEffect(() => {
@@ -125,8 +142,12 @@ export function App({ config }: { config: Config }) {
         });
         setChats((prev) => {
           const next = reorderChat(prev, m);
-          // Fire desktop notification for messages not in the active chat.
-          if (!m.is_from_me && selectedChatIdRef.current !== m.chat_id) {
+          // Notify when:
+          //  1. Terminal is unfocused → always (user isn't looking at itui at all)
+          //  2. Terminal is focused but message is for a different chat
+          const isActiveChat = selectedChatIdRef.current === m.chat_id;
+          const shouldNotify = !m.is_from_me && (!terminalFocusedRef.current || !isActiveChat);
+          if (shouldNotify) {
             const chat = next.find((c) => c.id === m.chat_id);
             const chatName = chat?.name || chat?.participants_resolved?.[0]?.name || "";
             notifyNewMessage(config, m, chatName);
