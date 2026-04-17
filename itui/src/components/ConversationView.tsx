@@ -46,7 +46,12 @@ export function ConversationView({
       onMouseDown={onFocusRequested}
     >
       <Header chat={chat} />
+      {/* key={chat?.id} forces React to unmount/remount the scrollbox when the
+          selected chat changes. A fresh scrollbox respects stickyStart="bottom"
+          from the start, so history-heavy conversations open at the newest
+          messages instead of sitting at the top. */}
       <scrollbox
+        key={chat?.id ?? "__empty__"}
         style={{ width: "100%", flexGrow: 1, paddingX: 3, paddingY: 1 }}
         stickyScroll={true}
         stickyStart="bottom"
