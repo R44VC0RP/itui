@@ -227,10 +227,10 @@ function MessageAttachments({
                   <Volume2Icon />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">
+                  <p className="text-app-supporting truncate font-medium">
                     {attachmentTitle(attachment)}
                   </p>
-                  <p className="truncate text-xs text-muted-foreground">
+                  <p className="text-app-meta truncate text-muted-foreground">
                     {attachmentDetail(attachment) || "Audio attachment"}
                   </p>
                 </div>
@@ -263,10 +263,10 @@ function MessageAttachments({
                       <AttachmentIcon attachment={attachment} />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium">
+                      <p className="text-app-supporting truncate font-medium">
                         {attachmentTitle(attachment)}
                       </p>
-                      <p className="truncate text-xs text-muted-foreground">
+                      <p className="text-app-meta truncate text-muted-foreground">
                         {attachmentDetail(attachment) || "Unavailable"}
                       </p>
                     </div>
@@ -300,10 +300,10 @@ function MessageAttachments({
                       </div>
 
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium">
+                        <p className="text-app-supporting truncate font-medium">
                           {attachmentTitle(attachment)}
                         </p>
-                        <p className="truncate text-xs text-muted-foreground">
+                        <p className="text-app-meta truncate text-muted-foreground">
                           {attachmentDetail(attachment) || "Video attachment"}
                         </p>
                       </div>
@@ -350,10 +350,10 @@ function MessageAttachments({
                   <a download href={href} rel="noreferrer" target="_blank">
                     <AttachmentIcon attachment={attachment} />
                     <span className="min-w-0 flex-1 text-left">
-                      <span className="block truncate text-sm font-medium">
+                      <span className="text-app-supporting block truncate font-medium">
                         {attachmentTitle(attachment)}
                       </span>
-                      <span className="block truncate text-xs text-muted-foreground">
+                      <span className="text-app-meta block truncate text-muted-foreground">
                         {attachmentDetail(attachment)}
                       </span>
                     </span>
@@ -603,10 +603,10 @@ function MessageDeliveryState({
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2 px-1 text-[11px] text-destructive">
+    <div className="text-app-meta flex flex-wrap items-center gap-2 px-1 text-destructive">
       <span>{message.deliveryError || "Not delivered"}</span>
       <Button
-        className="h-auto px-0 text-[11px] font-medium text-current"
+        className="text-app-meta h-auto px-0 font-medium text-current"
         onClick={() => void onRetryMessage(message)}
         size="sm"
         type="button"
@@ -656,7 +656,7 @@ export function MessageContent({
           {showBubble ? (
             <div
               className={cn(
-                "w-fit max-w-full rounded-[1.35rem] px-4 py-2.5 text-[15px] leading-6 whitespace-pre-wrap [overflow-wrap:anywhere] shadow-[0_1px_0_hsl(var(--foreground)/0.02)]",
+                "text-app-message w-fit max-w-full rounded-[1.35rem] px-4 py-2.5 whitespace-pre-wrap [overflow-wrap:anywhere] shadow-[0_1px_0_hsl(var(--foreground)/0.02)]",
                 message.is_from_me
                   ? outgoingBubbleClass(service)
                   : "bg-secondary text-foreground"

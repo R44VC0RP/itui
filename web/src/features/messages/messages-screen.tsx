@@ -60,7 +60,7 @@ export function MessagesScreen() {
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background lg:flex-row lg:bg-background/96">
               <aside className="hidden max-h-[42svh] min-h-[18rem] w-full flex-col bg-muted/45 lg:flex lg:max-h-none lg:min-h-0 lg:shrink-0 lg:basis-[22rem] lg:max-w-[22rem] xl:basis-[23.5rem] xl:max-w-[23.5rem]">
                 <header className="flex items-center justify-between gap-3 px-4 pt-4 pb-2">
-                  <h1 className="truncate text-[18px] font-semibold tracking-tight">
+                  <h1 className="text-app-screen-title truncate font-semibold tracking-tight">
                     Messages
                   </h1>
 
@@ -130,7 +130,7 @@ export function MessagesScreen() {
                           />
 
                           <div className="min-w-0">
-                            <h2 className="truncate text-[17px] font-semibold tracking-tight">
+                            <h2 className="text-app-header-title truncate font-semibold tracking-tight">
                               {activeConversation.title}
                             </h2>
 
@@ -142,7 +142,7 @@ export function MessagesScreen() {
                                 />
                               ) : null}
 
-                              <p className="min-w-0 truncate text-xs text-muted-foreground">
+                              <p className="text-app-header-meta min-w-0 truncate text-muted-foreground">
                                 {activeConversation.subtitle &&
                                 conversation.headerStatus !== "No conversation selected"
                                   ? `${activeConversation.subtitle} · ${conversation.headerStatus}`
@@ -157,11 +157,11 @@ export function MessagesScreen() {
                             <MessageCircleIcon />
                           </div>
                           <div className="min-w-0">
-                            <h2 className="truncate text-[17px] font-semibold tracking-tight">
+                            <h2 className="text-app-header-title truncate font-semibold tracking-tight">
                               Messages
                             </h2>
 
-                            <p className="truncate pt-0.5 text-xs text-muted-foreground">
+                            <p className="text-app-header-meta truncate pt-0.5 text-muted-foreground">
                               {conversation.headerStatus}
                             </p>
                           </div>

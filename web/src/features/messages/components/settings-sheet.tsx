@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { useAppTheme } from "@/components/theme-provider"
 import {
   serializeColorsToml,
@@ -23,6 +23,14 @@ import {
   type AppThemePreset,
 } from "@/lib/app-theme"
 import { DownloadIcon, KeyboardIcon, PaletteIcon, Trash2Icon, UploadIcon } from "lucide-react"
+
+const FONT_SCALE_OPTIONS = [
+  { label: "Small", value: 0.9 },
+  { label: "Default", value: 1 },
+  { label: "Medium", value: 1.1 },
+  { label: "Large", value: 1.2 },
+  { label: "Extra large", value: 1.3 },
+] as const
 
 const SHORTCUTS = [
   {
@@ -57,8 +65,10 @@ export function SettingsSheet({
   const {
     activeTheme,
     clearImportedTheme,
+    fontScale,
     importThemeFile,
     importedTheme,
+    setFontScale,
     setTheme,
     themeId,
     themes,
@@ -109,15 +119,12 @@ export function SettingsSheet({
 
   return (
     <Sheet onOpenChange={onOpenChange} open={open}>
-      <SheetContent className="w-full border-border/70 bg-background/98 p-0 sm:max-w-md">
-        <SheetHeader className="gap-2 px-6 pt-6 pb-5">
-          <SheetTitle className="text-[18px] font-semibold tracking-tight">
-            Settings
-          </SheetTitle>
-          <SheetDescription>
-            Appearance is stored in this browser only. Pick a built-in preset, download the current <code>colors.toml</code>, or import your own.
-          </SheetDescription>
-        </SheetHeader>
+        <SheetContent className="w-full border-border/70 bg-background/98 p-0 sm:max-w-md">
+          <SheetHeader className="gap-2 px-6 pt-6 pb-5">
+            <SheetTitle className="text-[18px] font-semibold tracking-tight">
+              Settings
+            </SheetTitle>
+          </SheetHeader>
 
         <Separator />
 
@@ -209,6 +216,30 @@ export function SettingsSheet({
                         </SelectGroup>
                       </>
                     ) : null}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <p className="text-xs font-medium tracking-[0.18em] text-muted-foreground uppercase">
+                  Text size
+                </p>
+
+                <Select
+                  onValueChange={(value) => setFontScale(Number.parseFloat(value))}
+                  value={fontScale.toFixed(1)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Choose a text size" />
+                  </SelectTrigger>
+                  <SelectContent align="start" position="popper">
+                    <SelectGroup>
+                      {FONT_SCALE_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value.toFixed(1)}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
                   </SelectContent>
                 </Select>
               </div>

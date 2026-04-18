@@ -117,11 +117,11 @@ export function ConversationList({
 
                   <div className="grid min-w-0 gap-0.75 overflow-hidden pr-1">
                     <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-2 overflow-hidden">
-                      <p className="min-w-0 truncate text-[15px] font-medium tracking-tight text-foreground">
+                      <p className="text-app-sidebar-title min-w-0 truncate font-medium tracking-tight text-foreground">
                         {thread.title}
                       </p>
 
-                      <span className="shrink-0 text-[11px] text-muted-foreground max-[1180px]:hidden">
+                      <span className="text-app-meta shrink-0 text-muted-foreground max-[1180px]:hidden">
                         {formatThreadTime(thread.lastActivity)}
                       </span>
                     </div>
@@ -129,7 +129,7 @@ export function ConversationList({
                     <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-x-2 overflow-hidden">
                       <p
                         className={cn(
-                          "[display:-webkit-box] min-w-0 overflow-hidden text-[13px] leading-5 break-words [-webkit-box-orient:vertical] [-webkit-line-clamp:2]",
+                          "text-app-sidebar-preview [display:-webkit-box] min-w-0 overflow-hidden break-words [-webkit-box-orient:vertical] [-webkit-line-clamp:2]",
                           isSelected
                             ? "text-foreground/80"
                             : "text-muted-foreground"

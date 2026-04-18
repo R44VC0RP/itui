@@ -147,7 +147,7 @@ export function ConversationThread({
                 {showDayDivider ? (
                   <div className="sticky top-3 z-10 flex justify-center py-2">
                     <Badge
-                      className="border-border/70 bg-background/92 px-2.5 text-[10px] tracking-[0.18em] uppercase shadow-sm backdrop-blur-sm"
+                      className="text-app-day-divider border-border/70 bg-background/92 px-2.5 tracking-[0.18em] uppercase shadow-sm backdrop-blur-sm"
                       variant="outline"
                     >
                       {formatDayDivider(message.created_at)}
@@ -170,7 +170,7 @@ export function ConversationThread({
                       />
 
                       {showTimestamp ? (
-                        <span className="px-1 text-[11px] text-muted-foreground">
+                        <span className="text-app-meta px-1 text-muted-foreground">
                           {formatMessageTime(message.created_at)}
                         </span>
                       ) : null}
@@ -193,7 +193,7 @@ export function ConversationThread({
 
                         <div className="min-w-0 flex-1">
                           {showSenderLabel ? (
-                            <p className="pb-1 text-[11px] font-medium tracking-[0.08em] text-muted-foreground uppercase">
+                            <p className="text-app-meta pb-1 font-medium tracking-[0.08em] text-muted-foreground uppercase">
                               {senderDisplayName(message)}
                             </p>
                           ) : null}
@@ -207,7 +207,7 @@ export function ConversationThread({
                       </div>
 
                       {showTimestamp ? (
-                        <span className="pl-[2.125rem] text-[11px] text-muted-foreground">
+                        <span className="text-app-meta pl-[2.125rem] text-muted-foreground">
                           {formatMessageTime(message.created_at)}
                         </span>
                       ) : null}

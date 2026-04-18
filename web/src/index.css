@@ -49,6 +49,25 @@
 }
 
 :root {
+  --app-font-scale: 1;
+  --app-text-screen-title: calc(1.125rem * var(--app-font-scale));
+  --app-leading-screen-title: calc(1.5rem * var(--app-font-scale));
+  --app-text-header-title: calc(1.0625rem * var(--app-font-scale));
+  --app-leading-header-title: calc(1.4375rem * var(--app-font-scale));
+  --app-text-header-meta: calc(0.75rem * var(--app-font-scale));
+  --app-leading-header-meta: calc(1rem * var(--app-font-scale));
+  --app-text-sidebar-title: calc(0.9375rem * var(--app-font-scale));
+  --app-leading-sidebar-title: calc(1.25rem * var(--app-font-scale));
+  --app-text-sidebar-preview: calc(0.8125rem * var(--app-font-scale));
+  --app-leading-sidebar-preview: calc(1.25rem * var(--app-font-scale));
+  --app-text-supporting: calc(0.875rem * var(--app-font-scale));
+  --app-leading-supporting: calc(1.25rem * var(--app-font-scale));
+  --app-text-message: calc(0.9375rem * var(--app-font-scale));
+  --app-leading-message: calc(1.5rem * var(--app-font-scale));
+  --app-text-meta: calc(0.6875rem * var(--app-font-scale));
+  --app-leading-meta: calc(1rem * var(--app-font-scale));
+  --app-text-day-divider: calc(0.625rem * var(--app-font-scale));
+  --app-leading-day-divider: calc(0.875rem * var(--app-font-scale));
   --background: oklch(0.985 0.004 240);
   --foreground: oklch(0.245 0.014 248);
   --card: oklch(0.995 0.002 240);
@@ -153,9 +172,57 @@
   }
   html {
     @apply font-sans;
+    font-size: calc(16px * var(--app-font-scale));
   }
   ::selection {
     color: var(--selection-foreground);
     background: var(--selection-background);
+  }
+}
+
+@layer utilities {
+  .text-app-screen-title {
+    font-size: var(--app-text-screen-title);
+    line-height: var(--app-leading-screen-title);
+  }
+
+  .text-app-header-title {
+    font-size: var(--app-text-header-title);
+    line-height: var(--app-leading-header-title);
+  }
+
+  .text-app-header-meta {
+    font-size: var(--app-text-header-meta);
+    line-height: var(--app-leading-header-meta);
+  }
+
+  .text-app-sidebar-title {
+    font-size: var(--app-text-sidebar-title);
+    line-height: var(--app-leading-sidebar-title);
+  }
+
+  .text-app-sidebar-preview {
+    font-size: var(--app-text-sidebar-preview);
+    line-height: var(--app-leading-sidebar-preview);
+  }
+
+  .text-app-supporting {
+    font-size: var(--app-text-supporting);
+    line-height: var(--app-leading-supporting);
+  }
+
+  .text-app-message {
+    font-size: var(--app-text-message);
+    line-height: var(--app-leading-message);
+  }
+
+  .text-app-meta {
+    font-size: var(--app-text-meta);
+    line-height: var(--app-leading-meta);
+  }
+
+  .text-app-day-divider {
+    font-size: var(--app-text-day-divider);
+    line-height: var(--app-leading-day-divider);
   }
 }

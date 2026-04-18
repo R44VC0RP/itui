@@ -22,17 +22,24 @@ type ThemeProviderProps = {
 type ThemeProviderState = {
   activeTheme: AppThemePreset
   clearImportedTheme: () => void
+  fontScale: number
   importThemeFile: (file: File) => Promise<void>
   importedTheme: AppThemePreset | null
+  setFontScale: (fontScale: number) => void
   setTheme: (themeId: string) => void
   themeId: string
   themes: AppThemePreset[]
 }
 
 type StoredThemeState = {
+  fontScale: number
   importedTheme: AppThemePreset | null
   themeId: string
 }
+
+const DEFAULT_FONT_SCALE = 1
+const MIN_FONT_SCALE = 0.9
+const MAX_FONT_SCALE = 1.3
 
 const ThemeProviderContext = React.createContext<
   ThemeProviderState | undefined
@@ -96,12 +103,20 @@ function readStoredThemeState(
 ): StoredThemeState {
   const storedTheme = localStorage.getItem(storageKey)
   if (!storedTheme) {
-    return { importedTheme: null, themeId: defaultTheme }
+    return {
+      fontScale: DEFAULT_FONT_SCALE,
+      importedTheme: null,
+      themeId: defaultTheme,
+    }
   }
 
   const legacyThemeId = getLegacyThemeId(storedTheme)
   if (legacyThemeId) {
-    return { importedTheme: null, themeId: legacyThemeId }
+    return {
+      fontScale: DEFAULT_FONT_SCALE,
+      importedTheme: null,
+      themeId: legacyThemeId,
+    }
   }
 
   try {
@@ -113,10 +128,18 @@ function readStoredThemeState(
       typeof parsed.themeId === "string" && parsed.themeId.length > 0
         ? parsed.themeId
         : defaultTheme
+    const fontScale =
+      typeof parsed.fontScale === "number"
+        ? normalizeFontScale(parsed.fontScale)
+        : DEFAULT_FONT_SCALE
 
-    return { importedTheme, themeId }
+    return { fontScale, importedTheme, themeId }
   } catch {
-    return { importedTheme: null, themeId: defaultTheme }
+    return {
+      fontScale: DEFAULT_FONT_SCALE,
+      importedTheme: null,
+      themeId: defaultTheme,
+    }
   }
 }
 
@@ -133,7 +156,7 @@ export function ThemeProvider({
   storageKey = "theme",
   disableTransitionOnChange = true,
 }: ThemeProviderProps) {
-  const [{ importedTheme, themeId }, setThemeState] =
+  const [{ fontScale, importedTheme, themeId }, setThemeState] =
     React.useState<StoredThemeState>(() =>
       readStoredThemeState(storageKey, defaultTheme)
     )
@@ -173,6 +196,7 @@ export function ThemeProvider({
   const clearImportedTheme = React.useCallback(() => {
     setThemeState((currentState) => {
       const nextState = {
+        fontScale: currentState.fontScale,
         importedTheme: null,
         themeId:
           currentState.themeId === IMPORTED_APP_THEME_ID
@@ -184,14 +208,29 @@ export function ThemeProvider({
     })
   }, [defaultTheme, storageKey])
 
+  const setFontScale = React.useCallback(
+    (nextFontScale: number) => {
+      setThemeState((currentState) => {
+        const nextState = {
+          ...currentState,
+          fontScale: normalizeFontScale(nextFontScale),
+        }
+        persistThemeState(storageKey, nextState)
+        return nextState
+      })
+    },
+    [storageKey]
+  )
+
   const importThemeFile = React.useCallback(
     async (file: File) => {
       const contents = await file.text()
       const importedPalette = parseColorsToml(contents)
       const nextImportedTheme = createImportedTheme(file.name, importedPalette)
 
-      setThemeState(() => {
+      setThemeState((currentState) => {
         const nextState = {
+          fontScale: currentState.fontScale,
           importedTheme: nextImportedTheme,
           themeId: nextImportedTheme.id,
         }
@@ -203,7 +242,7 @@ export function ThemeProvider({
   )
 
   const applyTheme = React.useCallback(
-    (theme: AppThemePreset) => {
+    (theme: AppThemePreset, nextFontScale: number) => {
       const root = document.documentElement
       const { cssVariables, mode } = deriveAppTheme(theme.palette)
       const restoreTransitions = disableTransitionOnChange
@@ -214,6 +253,7 @@ export function ThemeProvider({
       root.classList.add(mode)
       root.style.colorScheme = mode
       root.dataset.appTheme = theme.id
+      root.style.setProperty("--app-font-scale", String(normalizeFontScale(nextFontScale)))
 
       for (const [key, value] of Object.entries(cssVariables)) {
         root.style.setProperty(key, value)
@@ -227,8 +267,8 @@ export function ThemeProvider({
   )
 
   React.useEffect(() => {
-    applyTheme(activeTheme)
-  }, [activeTheme, applyTheme])
+    applyTheme(activeTheme, fontScale)
+  }, [activeTheme, applyTheme, fontScale])
 
   React.useEffect(() => {
     const handleStorageChange = (event: StorageEvent) => {
@@ -250,8 +290,10 @@ export function ThemeProvider({
     () => ({
       activeTheme,
       clearImportedTheme,
+      fontScale,
       importThemeFile,
       importedTheme,
+      setFontScale,
       setTheme,
       themeId: activeTheme.id,
       themes,
@@ -259,8 +301,10 @@ export function ThemeProvider({
     [
       activeTheme,
       clearImportedTheme,
+      fontScale,
       importThemeFile,
       importedTheme,
+      setFontScale,
       setTheme,
       themes,
     ]
@@ -280,4 +324,8 @@ export function useAppTheme() {
   }
 
   return context
+}
+
+function normalizeFontScale(value: number) {
+  return Math.min(MAX_FONT_SCALE, Math.max(MIN_FONT_SCALE, Number(value.toFixed(2))))
 }
