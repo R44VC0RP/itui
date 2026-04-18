@@ -20,8 +20,8 @@ const makeChat = (overrides: Partial<ChatRow> = {}): ChatRow => ({
       avatar_url: "/api/contacts/avatar?handle=%2B15555550123",
       handle: "+15555550123",
       has_avatar: true,
-      initials: "RB",
-      name: "Ryan Blalock",
+      initials: "AR",
+      name: "Alex Rowan",
     },
   ],
   preview: "See you soon",
@@ -33,7 +33,7 @@ describe("thread identity", () => {
   it("builds 1:1 summaries from resolved contact data", () => {
     const summary = buildThreadSummary(makeChat(), 3)
 
-    expect(summary.title).toBe("Ryan Blalock")
+    expect(summary.title).toBe("Alex Rowan")
     expect(summary.subtitle).toBe("+15555550123")
     expect(summary.contact?.handle).toBe("+15555550123")
     expect(summary.avatarContacts).toHaveLength(1)
@@ -60,8 +60,8 @@ describe("thread identity", () => {
             avatar_url: "/api/contacts/avatar?handle=%2B15555550123",
             handle: "+15555550123",
             has_avatar: true,
-            initials: "RB",
-            name: "Ryan Blalock",
+            initials: "AR",
+            name: "Alex Rowan",
           },
           {
             avatar_base64: undefined,
@@ -71,8 +71,8 @@ describe("thread identity", () => {
             avatar_url: undefined,
             handle: "+15555550124",
             has_avatar: false,
-            initials: "AS",
-            name: "Ava Stone",
+            initials: "MP",
+            name: "Morgan Park",
           },
           {
             avatar_base64: undefined,
@@ -82,15 +82,15 @@ describe("thread identity", () => {
             avatar_url: undefined,
             handle: "+15555550125",
             has_avatar: false,
-            initials: "DL",
-            name: "Dana Lee",
+            initials: "SK",
+            name: "Sam Kim",
           },
         ],
       }),
       0
     )
 
-    expect(summary.title).toBe("Ryan Blalock, Ava Stone, Dana Lee")
+    expect(summary.title).toBe("Alex Rowan, Morgan Park, Sam Kim")
     expect(summary.subtitle).toBe("3 participants")
     expect(summary.contact).toBeUndefined()
     expect(summary.avatarContacts).toHaveLength(2)

@@ -322,9 +322,13 @@ install_daemon() {
   mkdir -p "$DAEMON_LOG_DIR"
 
   # If an older version of the plist is already loaded, unload it so we can
-  # update ProgramArguments (port, binary path, etc.) cleanly.
+  # update ProgramArguments (port, binary path, etc.) cleanly. Booting out via
+  # the plist path is more reliable than the label-only target when re-running
+  # the installer over SSH or after a failed previous bootstrap.
   if launchctl print "gui/$UID/$DAEMON_LABEL" &>/dev/null; then
-    launchctl bootout "gui/$UID/$DAEMON_LABEL" 2>/dev/null || true
+    launchctl bootout "gui/$UID" "$DAEMON_PLIST" 2>/dev/null \
+      || launchctl bootout "gui/$UID/$DAEMON_LABEL" 2>/dev/null \
+      || true
   fi
 
   cat > "$DAEMON_PLIST" << PLIST
@@ -376,8 +380,15 @@ PLIST
     info "  Loaded LaunchAgent — running on 127.0.0.1:${port}"
     DAEMON_INSTALLED=1
   else
-    warn "Wrote plist but launchctl bootstrap failed."
-    dim "Load manually: launchctl bootstrap gui/\$UID $DAEMON_PLIST"
+    launchctl bootout "gui/$UID" "$DAEMON_PLIST" 2>/dev/null || true
+    if launchctl bootstrap "gui/$UID" "$DAEMON_PLIST" 2>/dev/null; then
+      launchctl kickstart -k "gui/$UID/$DAEMON_LABEL" &>/dev/null || true
+      info "  Loaded LaunchAgent — running on 127.0.0.1:${port}"
+      DAEMON_INSTALLED=1
+    else
+      warn "Wrote plist but launchctl bootstrap failed."
+      dim "Load manually: launchctl bootstrap gui/\$UID $DAEMON_PLIST"
+    fi
   fi
 }
 

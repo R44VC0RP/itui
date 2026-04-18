@@ -158,14 +158,14 @@ func participantsReturnsUniqueHandles() throws {
     VALUES (1, 'iMessage;+;chat123', 'iMessage;+;chat123', 'Group', 'iMessage')
     """
   )
-  try db.run("INSERT INTO handle(ROWID, id) VALUES (1, '+123'), (2, 'me@icloud.com')")
+  try db.run("INSERT INTO handle(ROWID, id) VALUES (1, '+123'), (2, 'me@example.com')")
   try db.run("INSERT INTO chat_handle_join(chat_id, handle_id) VALUES (1, 1), (1, 2), (1, 1)")
 
   let store = try MessageStore(connection: db, path: ":memory:")
   let participants = try store.participants(chatID: 1)
   #expect(participants.count == 2)
   #expect(participants.contains("+123"))
-  #expect(participants.contains("me@icloud.com"))
+  #expect(participants.contains("me@example.com"))
 }
 
 @Test

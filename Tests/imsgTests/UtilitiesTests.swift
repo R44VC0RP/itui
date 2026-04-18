@@ -88,7 +88,7 @@ func outputModelsEncodeExpectedKeys() throws {
     guid: "msg-guid-7",
     replyToGUID: "msg-guid-1",
     threadOriginatorGUID: "thread-guid-7",
-    destinationCallerID: "me@icloud.com"
+    destinationCallerID: "me@example.com"
   )
   let attachment = AttachmentMeta(
     rowID: 42,
@@ -116,7 +116,7 @@ func outputModelsEncodeExpectedKeys() throws {
   #expect(messageObject?["chat_id"] as? Int64 == 1)
   #expect(messageObject?["guid"] as? String == "msg-guid-7")
   #expect(messageObject?["reply_to_guid"] as? String == "msg-guid-1")
-  #expect(messageObject?["destination_caller_id"] as? String == "me@icloud.com")
+  #expect(messageObject?["destination_caller_id"] as? String == "me@example.com")
   #expect(messageObject?["thread_originator_guid"] as? String == "thread-guid-7")
   #expect(messageObject?["created_at"] != nil)
 

@@ -342,14 +342,14 @@ func messageSenderPrefersExistingChatGUIDOverHandleIdentifier() throws {
       attachmentPath: "",
       service: .auto,
       region: "US",
-      chatIdentifier: "+15612600573",
-      chatGUID: "any;-;+15612600573"
+      chatIdentifier: "+15555550123",
+      chatGUID: "any;-;+15555550123"
     )
   )
 
   #expect(captured[0].isEmpty)
   #expect(captured[2] == "auto")
-  #expect(captured[5] == "any;-;+15612600573")
+  #expect(captured[5] == "any;-;+15555550123")
   #expect(captured[6] == "1")
 }
 

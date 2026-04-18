@@ -221,8 +221,10 @@ export const messageCountLabel = (count: number) =>
   count === 1 ? "1 message" : `${count} messages`
 
 export const outgoingBubbleClass = (service: ThreadService) =>
-  service === "sms" || service === "rcs"
+  service === "sms"
     ? "bg-[var(--message-sms)] text-white"
+    : service === "rcs"
+      ? "bg-[var(--message-rcs)] text-white"
     : service === "auto"
       ? "bg-muted text-foreground"
       : "bg-[var(--message-imessage)] text-white"

@@ -68,7 +68,10 @@
   --input: oklch(0.91 0.007 248);
   --ring: #0a84ff;
   --message-imessage: #0a84ff;
+  --message-rcs: #3aa0c8;
   --message-sms: #34c759;
+  --selection-background: #cfe4ff;
+  --selection-foreground: #11304d;
   --chart-1: oklch(0.869 0.005 56.366);
   --chart-2: oklch(0.553 0.013 58.071);
   --chart-3: oklch(0.444 0.011 73.639);
@@ -105,7 +108,10 @@
   --input: oklch(0.335 0.01 248 / 80%);
   --ring: #0a84ff;
   --message-imessage: #0a84ff;
+  --message-rcs: #5cc8ff;
   --message-sms: #34c759;
+  --selection-background: #0a84ff;
+  --selection-foreground: #ffffff;
   --chart-1: oklch(0.869 0.005 56.366);
   --chart-2: oklch(0.553 0.013 58.071);
   --chart-3: oklch(0.444 0.011 73.639);
@@ -141,5 +147,9 @@
   }
   html {
     @apply font-sans;
+  }
+  ::selection {
+    color: var(--selection-foreground);
+    background: var(--selection-background);
   }
 }

@@ -23,8 +23,8 @@ const makeChat = (overrides: Partial<ChatRow> = {}): ChatRow => ({
       avatar_url: "/api/contacts/avatar?handle=%2B15555550123",
       handle: "+15555550123",
       has_avatar: true,
-      initials: "RB",
-      name: "Ryan Blalock",
+      initials: "AR",
+      name: "Alex Rowan",
     },
   ],
   preview: "See you soon",
@@ -49,8 +49,8 @@ describe("search ranking", () => {
             avatar_url: undefined,
             handle: "+15555550124",
             has_avatar: false,
-            initials: "MM",
-            name: "Mac mini",
+            initials: "OD",
+            name: "Office Desktop",
           },
         ],
         preview: "Ryan asked about the browser pass",
@@ -58,7 +58,7 @@ describe("search ranking", () => {
       0
     )
 
-    const ranked = rankThreads([previewOnlyThread, exactThread], "ryan")
+    const ranked = rankThreads([previewOnlyThread, exactThread], "alex")
 
     expect(ranked[0]?.id).toBe(exactThread.id)
   })
@@ -84,7 +84,7 @@ describe("search ranking", () => {
         service: "sms",
         subtitle: "+15555550123",
         threadId: 1,
-        title: "Ryan Blalock",
+        title: "Alex Rowan",
       },
       {
         avatarContacts: [],
@@ -130,7 +130,7 @@ describe("search ranking", () => {
         service: "sms",
         subtitle: "+15555550123",
         threadId: 1,
-        title: "Russ Blalock",
+        title: "Robin Parker",
       },
       {
         avatarContacts: [],
@@ -142,11 +142,11 @@ describe("search ranking", () => {
         participantContacts: [],
         service: "auto",
         subtitle: "+15555550124",
-        title: "Scott Pauley",
+        title: "Jordan Mills",
       },
     ]
 
-    const ranked = rankComposeOptions(options, "russ")
+    const ranked = rankComposeOptions(options, "robin")
     const deduped = dedupeComposeOptionsByHandle(ranked)
 
     expect(deduped).toHaveLength(1)

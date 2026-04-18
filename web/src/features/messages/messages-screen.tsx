@@ -14,12 +14,14 @@ import {
   CircleEllipsisIcon,
   MenuIcon,
   MessageCircleIcon,
+  Settings2Icon,
   SquarePenIcon,
 } from "lucide-react"
 
 import { ComposePickerDialog } from "@/features/messages/components/compose-picker-dialog"
 import { ConversationDetailsSheet } from "@/features/messages/components/conversation-details-sheet"
 import { ConversationList } from "@/features/messages/components/conversation-list"
+import { SettingsSheet } from "@/features/messages/components/settings-sheet"
 import { ConversationThread } from "@/features/messages/components/conversation-thread"
 import { MessageComposer } from "@/features/messages/components/message-composer"
 import { ThreadAvatar } from "@/features/messages/components/thread-avatar"
@@ -27,6 +29,7 @@ import { useMessagesController } from "@/features/messages/hooks/use-messages-co
 
 export function MessagesScreen() {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const controller = useMessagesController()
   const {
     activeConversation,
@@ -48,6 +51,7 @@ export function MessagesScreen() {
         onOpenChange={setIsDetailsOpen}
         open={isDetailsOpen}
       />
+      <SettingsSheet onOpenChange={setIsSettingsOpen} open={isSettingsOpen} />
 
       <Sheet open={sidebar.isOpen} onOpenChange={onSetSidebarOpen}>
         <div className="h-dvh overflow-hidden bg-background text-foreground">
@@ -59,14 +63,25 @@ export function MessagesScreen() {
                     Messages
                   </h1>
 
-                  <Button
-                    aria-label="New message"
-                    onClick={onOpenCompose}
-                    size="icon-sm"
-                    variant="ghost"
-                  >
-                    <SquarePenIcon />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      aria-label="Open settings"
+                      onClick={() => setIsSettingsOpen(true)}
+                      size="icon-sm"
+                      variant="ghost"
+                    >
+                      <Settings2Icon />
+                    </Button>
+
+                    <Button
+                      aria-label="New message"
+                      onClick={onOpenCompose}
+                      size="icon-sm"
+                      variant="ghost"
+                    >
+                      <SquarePenIcon />
+                    </Button>
+                  </div>
                 </header>
 
                 <ConversationList
@@ -208,18 +223,36 @@ export function MessagesScreen() {
               </section>
             </div>
 
-            <SheetContent
-              side="left"
-              className="w-[88vw] max-w-[360px] bg-background p-0 sm:bg-muted/55"
-            >
-              <SheetHeader className="border-b px-4 pt-4 pb-3">
-                <SheetTitle className="text-[18px] font-semibold tracking-tight">
-                  Messages
-                </SheetTitle>
-                <SheetDescription className="sr-only">
-                  Browse and search conversations.
-                </SheetDescription>
-              </SheetHeader>
+              <SheetContent
+                side="left"
+                className="w-[88vw] max-w-[360px] bg-background p-0 sm:bg-muted/55"
+                onOpenAutoFocus={(event) => event.preventDefault()}
+              >
+                <SheetHeader className="border-b px-4 pt-4 pb-3">
+                  <div className="flex items-center justify-between gap-3 pr-12">
+                    <div className="min-w-0">
+                      <SheetTitle className="text-[18px] font-semibold tracking-tight">
+                        Messages
+                      </SheetTitle>
+                      <SheetDescription className="sr-only">
+                        Browse and search conversations.
+                      </SheetDescription>
+                    </div>
+
+                    <Button
+                      aria-label="Open settings"
+                      onClick={() => {
+                        onSetSidebarOpen(false)
+                        setIsSettingsOpen(true)
+                      }}
+                      size="icon-sm"
+                      type="button"
+                      variant="ghost"
+                    >
+                      <Settings2Icon />
+                    </Button>
+                  </div>
+                </SheetHeader>
 
               <ConversationList
                 errorMessage={conversation.loadError}

@@ -51,7 +51,7 @@ func messagesUseDestinationCallerIDWhenSenderMissing() throws {
   try db.run(
     """
     INSERT INTO message(ROWID, handle_id, text, destination_caller_id, date, is_from_me, service)
-    VALUES (1, NULL, 'hello', 'me@icloud.com', ?, 1, 'iMessage')
+    VALUES (1, NULL, 'hello', 'me@example.com', ?, 1, 'iMessage')
     """,
     Int64(Date().timeIntervalSince1970 - MessageStore.appleEpochOffset) * 1_000_000_000
   )
@@ -59,6 +59,6 @@ func messagesUseDestinationCallerIDWhenSenderMissing() throws {
 
   let store = try MessageStore(connection: db, path: ":memory:")
   let messages = try store.messages(chatID: 1, limit: 5)
-  #expect(messages.first?.sender == "me@icloud.com")
-  #expect(messages.first?.destinationCallerID == "me@icloud.com")
+  #expect(messages.first?.sender == "me@example.com")
+  #expect(messages.first?.destinationCallerID == "me@example.com")
 }
