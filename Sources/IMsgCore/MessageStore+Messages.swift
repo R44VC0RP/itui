@@ -18,6 +18,7 @@ private struct MessageRowColumns {
   let attachments: Int
   let body: Int
   let threadOriginatorGUID: Int
+  let balloonBundleID: Int?
 }
 
 private struct DecodedMessageRow {
@@ -35,6 +36,7 @@ private struct DecodedMessageRow {
   let associatedType: Int?
   let attachments: Int
   let threadOriginatorGUID: String
+  let balloonBundleID: String
 }
 
 extension MessageStore {
@@ -49,6 +51,7 @@ extension MessageStore {
     let associatedTypeColumn = hasReactionColumns ? "m.associated_message_type" : "NULL"
     let destinationCallerColumn = hasDestinationCallerID ? "m.destination_caller_id" : "NULL"
     let audioMessageColumn = hasAudioMessageColumn ? "m.is_audio_message" : "0"
+    let balloonBundleIDColumn = hasBalloonBundleIDColumn ? "m.balloon_bundle_id" : "NULL"
     let threadOriginatorColumn =
       hasThreadOriginatorGUIDColumn ? "m.thread_originator_guid" : "NULL"
     let reactionFilter =
@@ -61,7 +64,8 @@ extension MessageStore {
              \(guidColumn) AS guid, \(associatedGuidColumn) AS associated_guid, \(associatedTypeColumn) AS associated_type,
              (SELECT COUNT(*) FROM message_attachment_join maj WHERE maj.message_id = m.ROWID) AS attachments,
              \(bodyColumn) AS body,
-             \(threadOriginatorColumn) AS thread_originator_guid
+             \(threadOriginatorColumn) AS thread_originator_guid,
+             \(balloonBundleIDColumn) AS balloon_bundle_id
       FROM message m
       JOIN chat_message_join cmj ON m.ROWID = cmj.message_id
       LEFT JOIN handle h ON m.handle_id = h.ROWID
@@ -108,7 +112,8 @@ extension MessageStore {
       associatedType: 11,
       attachments: 12,
       body: 13,
-      threadOriginatorGUID: 14
+      threadOriginatorGUID: 14,
+      balloonBundleID: 15
     )
 
     return try withConnection { db in
@@ -128,6 +133,7 @@ extension MessageStore {
             date: decoded.date,
             isFromMe: decoded.isFromMe,
             service: decoded.service,
+            balloonBundleID: decoded.balloonBundleID.isEmpty ? nil : decoded.balloonBundleID,
             handleID: decoded.handleID,
             attachmentsCount: decoded.attachments,
             guid: decoded.guid,
@@ -216,10 +222,9 @@ extension MessageStore {
       associatedType: 12,
       attachments: 13,
       body: 14,
-      threadOriginatorGUID: 15
+      threadOriginatorGUID: 15,
+      balloonBundleID: 16
     )
-
-    let balloonBundleIDIndex = 16
 
     return try withConnection { db in
       var messages: [Message] = []
@@ -227,8 +232,7 @@ extension MessageStore {
 
       for row in try db.prepare(sql, bindings) {
         let decoded = try decodeMessageRow(row, columns: columns, fallbackChatID: chatID)
-        let balloonBundleID = stringValue(row[balloonBundleIDIndex])
-        if balloonBundleID == urlBalloonProvider,
+        if decoded.balloonBundleID == urlBalloonProvider,
           shouldSkipURLBalloonDuplicate(
             chatID: decoded.chatID,
             sender: decoded.sender,
@@ -260,6 +264,7 @@ extension MessageStore {
             date: decoded.date,
             isFromMe: decoded.isFromMe,
             service: decoded.service,
+            balloonBundleID: decoded.balloonBundleID.isEmpty ? nil : decoded.balloonBundleID,
             handleID: decoded.handleID,
             attachmentsCount: decoded.attachments,
             guid: decoded.guid,
@@ -303,6 +308,7 @@ extension MessageStore {
     let attachments = intValue(row[columns.attachments]) ?? 0
     let body = dataValue(row[columns.body])
     let threadOriginatorGUID = stringValue(row[columns.threadOriginatorGUID])
+    let balloonBundleID = columns.balloonBundleID.map { stringValue(row[$0]) } ?? ""
 
     var resolvedText = text.isEmpty ? TypedStreamParser.parseAttributedBody(body) : text
     if isAudioMessage, let transcription = try audioTranscription(for: rowID) {
@@ -328,7 +334,8 @@ extension MessageStore {
       associatedGUID: associatedGUID,
       associatedType: associatedType,
       attachments: attachments,
-      threadOriginatorGUID: threadOriginatorGUID
+      threadOriginatorGUID: threadOriginatorGUID,
+      balloonBundleID: balloonBundleID
     )
   }
 }

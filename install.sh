@@ -5,8 +5,8 @@ set -euo pipefail
 # itui installer
 #
 # Sets up both pieces:
-#   1. imsg  — the iMessage API server (Swift, macOS only)
-#   2. itui  — the terminal UI client  (Bun + OpenTUI, any platform)
+#   1. imsg  — the macOS server that serves the web UI and API
+#   2. itui  — the optional terminal UI client (Bun + OpenTUI)
 #
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/R44VC0RP/itui/main/install.sh | bash
@@ -27,14 +27,26 @@ warn()  { echo -e "${BOLD}${YELLOW}▸${RESET} $1"; }
 error() { echo -e "${BOLD}${RED}▸${RESET} $1"; }
 dim()   { echo -e "${DIM}  $1${RESET}"; }
 
-REPO_URL="https://github.com/R44VC0RP/itui.git"
+prepend_path() {
+  local dir="$1"
+  if [[ -d "$dir" ]]; then
+    PATH="$dir:$PATH"
+  fi
+}
+
+prepend_path "$HOME/.bun/bin"
+prepend_path "/opt/homebrew/bin"
+prepend_path "/usr/local/bin"
+prepend_path "/Applications/Tailscale.app/Contents/MacOS"
+
+REPO_URL="${ITUI_REPO_URL:-https://github.com/R44VC0RP/itui.git}"
 INSTALL_DIR="${ITUI_INSTALL_DIR:-$HOME/.itui}"
 
 # ── Preflight ─────────────────────────────────────────────────────────────────
 
 echo ""
 echo -e "${BOLD}  itui installer${RESET}"
-echo -e "  iMessage in your terminal"
+echo -e "  iMessage in your terminal and browser"
 echo ""
 
 # Check for macOS (server requires it; client works anywhere but the install
@@ -57,13 +69,40 @@ check_dep() {
 }
 
 MISSING=0
+HAS_BUN=0
+HAS_NODE=0
+HAS_TAILSCALE=0
+
+if command -v bun &>/dev/null; then
+  HAS_BUN=1
+fi
+
+if command -v node &>/dev/null && command -v npm &>/dev/null; then
+  HAS_NODE=1
+fi
+
+if command -v tailscale &>/dev/null; then
+  HAS_TAILSCALE=1
+fi
 
 if [[ "$(uname -s)" == "Darwin" ]]; then
   check_dep swift "Install Xcode or Xcode Command Line Tools: xcode-select --install" || MISSING=1
 fi
 
-check_dep bun "Install Bun: curl -fsSL https://bun.sh/install | bash" || MISSING=1
 check_dep git "Install git via Xcode CLT or Homebrew" || MISSING=1
+
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  if [[ "$HAS_BUN" -eq 0 ]]; then
+    warn "bun not found. Skipping the optional TUI client install."
+    dim "Install Bun later if you also want the terminal UI: curl -fsSL https://bun.sh/install | bash"
+  fi
+else
+  if [[ "$HAS_BUN" -eq 0 ]]; then
+    error "bun is required to install the itui client on non-macOS systems."
+    dim "Install Bun: curl -fsSL https://bun.sh/install | bash"
+    MISSING=1
+  fi
+fi
 
 if [[ "$MISSING" -eq 1 ]]; then
   echo ""
@@ -71,21 +110,60 @@ if [[ "$MISSING" -eq 1 ]]; then
   exit 1
 fi
 
-info "Dependencies OK — swift $(swift --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' || echo 'n/a'), bun $(bun --version)"
+SUMMARY=()
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  SWIFT_VERSION="$(swift --version 2>/dev/null | awk '/Swift version/{print $4; exit}')"
+  SUMMARY+=("swift ${SWIFT_VERSION:-n/a}")
+fi
+SUMMARY+=("git $(git --version | awk '{print $3}')")
+if [[ "$HAS_BUN" -eq 1 ]]; then
+  SUMMARY+=("bun $(bun --version)")
+fi
+if [[ "$HAS_NODE" -eq 1 ]]; then
+  SUMMARY+=("node $(node --version)")
+fi
+info "Dependencies OK — ${SUMMARY[*]}"
 
 # ── Clone / update ────────────────────────────────────────────────────────────
 
 if [[ -d "$INSTALL_DIR/.git" ]]; then
   info "Updating existing install at $INSTALL_DIR"
-  git -C "$INSTALL_DIR" pull --ff-only || {
-    warn "Pull failed — continuing with existing checkout"
-  }
+  if git -C "$INSTALL_DIR" remote get-url origin >/dev/null 2>&1; then
+    git -C "$INSTALL_DIR" pull --ff-only || {
+      warn "Pull failed — continuing with existing checkout"
+    }
+  else
+    warn "No git remote configured — continuing with existing checkout"
+  fi
 else
   info "Cloning to $INSTALL_DIR"
   git clone "$REPO_URL" "$INSTALL_DIR"
 fi
 
 cd "$INSTALL_DIR"
+
+# ── Refresh bundled browser assets if possible ───────────────────────────────
+
+if [[ "$(uname -s)" == "Darwin" && -f "$INSTALL_DIR/scripts/build-web.sh" ]]; then
+  echo ""
+
+  if [[ "$HAS_NODE" -eq 1 ]]; then
+    info "Refreshing bundled browser assets…"
+    if ! "$INSTALL_DIR/scripts/build-web.sh"; then
+      if [[ -f "$INSTALL_DIR/Sources/imsg/Resources/web/index.html" ]]; then
+        warn "Web build failed — continuing with checked-in bundled assets"
+      else
+        error "Bundled browser assets are missing and the local web build failed."
+        exit 1
+      fi
+    fi
+  elif [[ -f "$INSTALL_DIR/Sources/imsg/Resources/web/index.html" ]]; then
+    warn "Node.js/npm not found. Using checked-in bundled browser assets."
+  else
+    error "Bundled browser assets are missing and Node.js/npm are not available to rebuild them."
+    exit 1
+  fi
+fi
 
 # ── Build the imsg server (macOS only) ────────────────────────────────────────
 
@@ -118,11 +196,14 @@ fi
 
 # ── Install the itui client ──────────────────────────────────────────────────
 
-echo ""
-info "Installing itui client…"
-cd "$INSTALL_DIR/itui"
-bun install --frozen-lockfile 2>/dev/null || bun install
-info "Client dependencies installed"
+if [[ "$HAS_BUN" -eq 1 ]]; then
+  echo ""
+  info "Installing itui client…"
+  cd "$INSTALL_DIR/itui"
+  bun install --frozen-lockfile 2>/dev/null || bun install
+  info "Client dependencies installed"
+  cd "$INSTALL_DIR"
+fi
 
 # ── Symlinks ──────────────────────────────────────────────────────────────────
 
@@ -132,13 +213,16 @@ info "Creating symlinks…"
 BIN_DIR="$HOME/.local/bin"
 mkdir -p "$BIN_DIR"
 
-# itui launcher script
-cat > "$BIN_DIR/itui" << 'LAUNCHER'
+if [[ "$HAS_BUN" -eq 1 ]]; then
+  BUN_BIN="$(command -v bun)"
+  # itui launcher script
+  cat > "$BIN_DIR/itui" << LAUNCHER
 #!/usr/bin/env bash
-exec bun run "$HOME/.itui/itui/src/cli.tsx" "$@"
+exec "$BUN_BIN" run "$INSTALL_DIR/itui/src/cli.tsx" "\$@"
 LAUNCHER
-chmod +x "$BIN_DIR/itui"
-info "  itui  → $BIN_DIR/itui"
+  chmod +x "$BIN_DIR/itui"
+  info "  itui  → $BIN_DIR/itui"
+fi
 
 # imsg server (macOS only)
 if [[ "$(uname -s)" == "Darwin" ]]; then
@@ -164,10 +248,11 @@ fi
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
-CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/itui"
-if [[ ! -f "$CONFIG_DIR/config.json" ]]; then
-  mkdir -p "$CONFIG_DIR"
-  cat > "$CONFIG_DIR/config.json" << 'CONFIG'
+if [[ "$HAS_BUN" -eq 1 ]]; then
+  CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/itui"
+  if [[ ! -f "$CONFIG_DIR/config.json" ]]; then
+    mkdir -p "$CONFIG_DIR"
+    cat > "$CONFIG_DIR/config.json" << 'CONFIG'
 {
   "server": "http://127.0.0.1:8080",
   "token": null,
@@ -178,9 +263,10 @@ if [[ ! -f "$CONFIG_DIR/config.json" ]]; then
   "notificationSound": true
 }
 CONFIG
-  info "Created config at $CONFIG_DIR/config.json"
-else
-  info "Config already exists at $CONFIG_DIR/config.json"
+    info "Created config at $CONFIG_DIR/config.json"
+  else
+    info "Config already exists at $CONFIG_DIR/config.json"
+  fi
 fi
 
 # ── macOS permissions reminder ────────────────────────────────────────────────
@@ -199,6 +285,10 @@ if [[ "$(uname -s)" == "Darwin" ]]; then
   echo ""
   echo "    3. Automation (Messages) → granted on first send (a prompt will appear)"
   echo ""
+  echo "  If you plan to launch imsg over SSH or another background context,"
+  echo "  run it once locally first so macOS can show the Contacts and"
+  echo "  Automation permission prompts."
+  echo ""
 fi
 
 # ── Done ──────────────────────────────────────────────────────────────────────
@@ -209,15 +299,38 @@ echo ""
 echo "  Quick start:"
 echo ""
 if [[ "$(uname -s)" == "Darwin" ]]; then
-  echo "    1. Start the server:   imsg serve"
-  echo "    2. Open the TUI:       itui"
+  echo "    1. Start the web app:  imsg serve --host 127.0.0.1 --port 8080"
+  echo "    2. Open in browser:    http://127.0.0.1:8080"
+  if [[ "$HAS_BUN" -eq 1 ]]; then
+    echo "    3. Optional TUI:       itui"
+  fi
 else
   echo "    1. Point at your Mac:  itui config set server=http://your-mac:8080"
   echo "    2. Open the TUI:       itui"
 fi
 echo ""
-echo "  Remote access (from another machine):"
-echo ""
-echo "    ssh -N -L 8080:127.0.0.1:8080 you@your-mac"
-echo "    itui"
-echo ""
+
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  if [[ "$HAS_TAILSCALE" -eq 1 ]]; then
+    echo "  Optional Tailscale Serve:"
+    echo ""
+    echo "    tailscale serve --bg 8080"
+    echo "    tailscale serve status"
+    echo ""
+    echo "  Open the HTTPS URL shown by 'tailscale serve status' from another"
+    echo "  device in your tailnet."
+    echo ""
+  fi
+
+  echo "  Remote access (without Tailscale):"
+  echo ""
+  echo "    ssh -N -L 8080:127.0.0.1:8080 you@your-mac"
+  echo "    # then open http://127.0.0.1:8080 or run itui"
+  echo ""
+else
+  echo "  Remote access (from another machine):"
+  echo ""
+  echo "    ssh -N -L 8080:127.0.0.1:8080 you@your-mac"
+  echo "    itui"
+  echo ""
+fi

@@ -42,13 +42,13 @@ On first launch, itui creates `~/.config/itui/config.json` with defaults:
 Point it at a different server:
 
 ```sh
-itui config set server=http://mac-mini.local:8080
+itui config set server=http://imsg-host.local:8080
 ```
 
 Or for a single run:
 
 ```sh
-itui --server=http://mac-mini.local:8080
+itui --server=http://imsg-host.local:8080
 ```
 
 ## Remote usage
@@ -58,7 +58,7 @@ either expose it on a trusted network or tunnel in over SSH:
 
 ```sh
 # From your laptop, tunnel :8080 on the Mac to localhost:8080
-ssh -N -L 8080:127.0.0.1:8080 you@mac-mini.local
+ssh -N -L 8080:127.0.0.1:8080 user@your-hostname
 
 # In another terminal on the laptop
 itui

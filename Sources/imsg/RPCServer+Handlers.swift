@@ -36,6 +36,7 @@ extension RPCServer {
           name: name,
           service: service,
           lastMessageAt: chat.lastMessageAt,
+          preview: chat.preview,
           participants: participants,
           participantsResolved: resolved
         ))

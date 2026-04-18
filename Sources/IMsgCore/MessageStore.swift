@@ -115,14 +115,68 @@ public final class MessageStore: @unchecked Sendable {
   }
 
   public func listChats(limit: Int) throws -> [Chat] {
+    let bodyColumn = hasAttributedBody ? "m.attributedBody" : "NULL"
+    let associatedTypeColumn = hasReactionColumns ? "m.associated_message_type" : "NULL"
+    let audioMessageColumn = hasAudioMessageColumn ? "m.is_audio_message" : "0"
     let sql = """
-      SELECT c.ROWID, IFNULL(c.display_name, c.chat_identifier) AS name, c.chat_identifier, c.service_name,
-             MAX(m.date) AS last_date
+      WITH ranked_messages AS (
+        SELECT
+          cmj.chat_id AS chat_id,
+          m.ROWID AS message_id,
+          IFNULL(m.text, '') AS text,
+          m.is_from_me,
+          m.date,
+          \(associatedTypeColumn) AS associated_type,
+          \(bodyColumn) AS body,
+          \(audioMessageColumn) AS is_audio_message,
+          (
+            SELECT COUNT(*)
+            FROM message_attachment_join maj
+            WHERE maj.message_id = m.ROWID
+          ) AS attachment_count,
+          (
+            SELECT IFNULL(a.transfer_name, '')
+            FROM message_attachment_join maj
+            JOIN attachment a ON a.ROWID = maj.attachment_id
+            WHERE maj.message_id = m.ROWID
+            ORDER BY a.ROWID ASC
+            LIMIT 1
+          ) AS attachment_transfer_name,
+          (
+            SELECT IFNULL(a.mime_type, '')
+            FROM message_attachment_join maj
+            JOIN attachment a ON a.ROWID = maj.attachment_id
+            WHERE maj.message_id = m.ROWID
+            ORDER BY a.ROWID ASC
+            LIMIT 1
+          ) AS attachment_mime_type,
+          ROW_NUMBER() OVER (
+            PARTITION BY cmj.chat_id
+            ORDER BY m.date DESC, m.ROWID DESC
+          ) AS message_rank
+        FROM chat_message_join cmj
+        JOIN message m ON m.ROWID = cmj.message_id
+      )
+      SELECT
+        c.ROWID,
+        IFNULL(c.display_name, c.chat_identifier) AS name,
+        c.chat_identifier,
+        c.service_name,
+        ranked_messages.date AS last_date,
+        ranked_messages.message_id,
+        ranked_messages.text,
+        ranked_messages.is_from_me,
+        ranked_messages.associated_type,
+        ranked_messages.attachment_count,
+        ranked_messages.attachment_transfer_name,
+        ranked_messages.attachment_mime_type,
+        ranked_messages.body,
+        ranked_messages.is_audio_message
       FROM chat c
-      JOIN chat_message_join cmj ON c.ROWID = cmj.chat_id
-      JOIN message m ON m.ROWID = cmj.message_id
-      GROUP BY c.ROWID
-      ORDER BY last_date DESC
+      JOIN ranked_messages
+        ON ranked_messages.chat_id = c.ROWID
+        AND ranked_messages.message_rank = 1
+      ORDER BY ranked_messages.date DESC, ranked_messages.message_id DESC
       LIMIT ?
       """
     return try withConnection { db in
@@ -133,9 +187,40 @@ public final class MessageStore: @unchecked Sendable {
         let identifier = stringValue(row[2])
         let service = stringValue(row[3])
         let lastDate = appleDate(from: int64Value(row[4]))
+        let messageID = int64Value(row[5]) ?? 0
+        let text = stringValue(row[6])
+        let isFromMe = boolValue(row[7])
+        let associatedType = intValue(row[8])
+        let attachmentCount = intValue(row[9]) ?? 0
+        let attachmentTransferName = stringValue(row[10])
+        let attachmentMimeType = stringValue(row[11])
+        let body = dataValue(row[12])
+        let isAudioMessage = boolValue(row[13])
+        var resolvedText = text.isEmpty ? TypedStreamParser.parseAttributedBody(body) : text
+        if isAudioMessage,
+          let transcription = try audioTranscription(for: messageID),
+          !transcription.isEmpty
+        {
+          resolvedText = transcription
+        }
+
         chats.append(
           Chat(
-            id: id, identifier: identifier, name: name, service: service, lastMessageAt: lastDate))
+            id: id,
+            identifier: identifier,
+            name: name,
+            service: service,
+            lastMessageAt: lastDate,
+            preview: MessageStore.chatPreviewSummary(
+              text: resolvedText,
+              isFromMe: isFromMe,
+              associatedType: associatedType,
+              attachmentCount: attachmentCount,
+              attachmentTransferName: attachmentTransferName,
+              attachmentMimeType: attachmentMimeType
+            )
+          )
+        )
       }
       return chats
     }
@@ -229,6 +314,80 @@ public final class MessageStore: @unchecked Sendable {
     guard !urlBalloonDedupe.isEmpty else { return }
     let cutoff = referenceDate.addingTimeInterval(-MessageStore.urlBalloonDedupeRetention)
     urlBalloonDedupe = urlBalloonDedupe.filter { $0.value.date >= cutoff }
+  }
+
+  private static func chatPreviewSummary(
+    text: String,
+    isFromMe: Bool,
+    associatedType: Int?,
+    attachmentCount: Int,
+    attachmentTransferName: String,
+    attachmentMimeType: String
+  ) -> String {
+    let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+
+    let summary: String
+    if !trimmedText.isEmpty {
+      summary = trimmedText
+    } else if let associatedType, ReactionType.isReaction(associatedType) {
+      summary = reactionPreviewSummary(text: trimmedText, associatedType: associatedType)
+    } else if attachmentCount > 0 {
+      summary = attachmentPreviewSummary(
+        count: attachmentCount,
+        transferName: attachmentTransferName,
+        mimeType: attachmentMimeType
+      )
+    } else {
+      summary = "Message"
+    }
+
+    return isFromMe ? "You: \(summary)" : summary
+  }
+
+  private static func reactionPreviewSummary(text: String, associatedType: Int) -> String {
+    let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    let customEmoji = trimmedText.isEmpty ? nil : trimmedText
+
+    let reactionType: ReactionType?
+    if ReactionType.isReactionRemove(associatedType) {
+      reactionType = ReactionType.fromRemoval(associatedType, customEmoji: customEmoji)
+    } else {
+      reactionType = ReactionType(rawValue: associatedType, customEmoji: customEmoji)
+    }
+
+    let emoji = reactionType?.emoji ?? customEmoji ?? ""
+    if ReactionType.isReactionRemove(associatedType) {
+      return emoji.isEmpty ? "Removed a reaction" : "Removed \(emoji)"
+    }
+
+    return emoji.isEmpty ? "Reacted to a message" : "Reacted with \(emoji)"
+  }
+
+  private static func attachmentPreviewSummary(
+    count: Int,
+    transferName: String,
+    mimeType: String
+  ) -> String {
+    if count > 1 {
+      return "\(count) attachments"
+    }
+
+    let trimmedTransferName = transferName.trimmingCharacters(in: .whitespacesAndNewlines)
+    if !trimmedTransferName.isEmpty {
+      return trimmedTransferName
+    }
+
+    if mimeType.hasPrefix("image/") {
+      return "Photo"
+    }
+    if mimeType.hasPrefix("video/") {
+      return "Video"
+    }
+    if mimeType.hasPrefix("audio/") {
+      return "Audio message"
+    }
+
+    return "Attachment"
   }
 }
 

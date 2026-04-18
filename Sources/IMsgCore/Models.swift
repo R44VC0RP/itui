@@ -190,13 +190,22 @@ public struct Chat: Sendable, Equatable {
   public let name: String
   public let service: String
   public let lastMessageAt: Date
+  public let preview: String
 
-  public init(id: Int64, identifier: String, name: String, service: String, lastMessageAt: Date) {
+  public init(
+    id: Int64,
+    identifier: String,
+    name: String,
+    service: String,
+    lastMessageAt: Date,
+    preview: String
+  ) {
     self.id = id
     self.identifier = identifier
     self.name = name
     self.service = service
     self.lastMessageAt = lastMessageAt
+    self.preview = preview
   }
 }
 
@@ -262,6 +271,7 @@ public struct Message: Sendable, Equatable {
   public let date: Date
   public let isFromMe: Bool
   public let service: String
+  public let balloonBundleID: String?
   public let handleID: Int64?
   public let attachmentsCount: Int
   /// The destination_caller_id from the database. For messages where is_from_me is true,
@@ -287,6 +297,7 @@ public struct Message: Sendable, Equatable {
     date: Date,
     isFromMe: Bool,
     service: String,
+    balloonBundleID: String? = nil,
     handleID: Int64?,
     attachmentsCount: Int,
     guid: String = "",
@@ -303,6 +314,7 @@ public struct Message: Sendable, Equatable {
     self.date = date
     self.isFromMe = isFromMe
     self.service = service
+    self.balloonBundleID = balloonBundleID
     self.handleID = handleID
     self.attachmentsCount = attachmentsCount
     self.destinationCallerID = routing.destinationCallerID
@@ -320,6 +332,7 @@ public struct Message: Sendable, Equatable {
     date: Date,
     isFromMe: Bool,
     service: String,
+    balloonBundleID: String? = nil,
     handleID: Int64?,
     attachmentsCount: Int,
     guid: String = "",
@@ -339,6 +352,7 @@ public struct Message: Sendable, Equatable {
       date: date,
       isFromMe: isFromMe,
       service: service,
+      balloonBundleID: balloonBundleID,
       handleID: handleID,
       attachmentsCount: attachmentsCount,
       guid: guid,

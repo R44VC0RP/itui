@@ -21,11 +21,13 @@ func chatPayloadIncludesParticipantsAndGroupFlag() {
     name: "Group",
     service: "iMessage",
     lastMessageAt: date,
+    preview: "Latest preview",
     participants: ["+111", "+222"]
   )
   #expect(payload["id"] as? Int64 == 1)
   #expect(payload["identifier"] as? String == "iMessage;+;chat123")
   #expect(payload["is_group"] as? Bool == true)
+  #expect(payload["preview"] as? String == "Latest preview")
   #expect((payload["participants"] as? [String])?.count == 2)
 }
 

@@ -35,7 +35,10 @@ extension WebServer {
                 attachments: attachments,
                 reactions: reactions,
                 senderContact: senderContact,
-                attachmentURLBuilder: { id in WebServer.attachmentURLPath(id: id) }
+                attachmentURLBuilder: { id in WebServer.attachmentURLPath(id: id) },
+                attachmentPreviewURLBuilder: { id in
+                  WebServer.attachmentPreviewURLPath(id: id)
+                }
               )
               let event = WSMessageEvent(type: "message", message: payload)
               let data = try JSONEncoder().encode(event)

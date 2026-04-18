@@ -69,7 +69,7 @@ func jsonLinesPrintsSingleLineJSON() throws {
 func outputModelsEncodeExpectedKeys() throws {
   let chat = Chat(
     id: 1, identifier: "+123", name: "Test", service: "iMessage",
-    lastMessageAt: Date(timeIntervalSince1970: 0))
+    lastMessageAt: Date(timeIntervalSince1970: 0), preview: "hi")
   let chatPayload = ChatPayload(chat: chat)
   let chatData = try JSONEncoder().encode(chatPayload)
   let chatObject = try JSONSerialization.jsonObject(with: chatData) as? [String: Any]
@@ -151,4 +151,66 @@ func parsedValuesHelpers() throws {
   #expect(runtime.jsonOutput == true)
   #expect(runtime.verbose == true)
   #expect(runtime.logLevel == "debug")
+}
+
+@Test
+func attachmentPreviewAndMediaDirectoryHelpersHandleStickerCacheAndPreviewRoutes() {
+  #expect(WebServer.attachmentPreviewURLPath(id: 42) == "/api/attachments/42/preview")
+  #expect(
+    WebServer.isInsideMessagesMediaDirectory(
+      path: "/Users/test/Library/Messages/Attachments/aa/bb/file.heic",
+      homeDirectory: "/Users/test"
+    ) == true
+  )
+  #expect(
+    WebServer.isInsideMessagesMediaDirectory(
+      path: "/Users/test/Library/Messages/StickerCache/sticker.heic",
+      homeDirectory: "/Users/test"
+    ) == true
+  )
+  #expect(
+    WebServer.isInsideMessagesMediaDirectory(
+      path: "/Users/test/Documents/not-allowed.png",
+      homeDirectory: "/Users/test"
+    ) == false
+  )
+
+  let heic = AttachmentMeta(
+    rowID: 1,
+    filename: "photo.heic",
+    transferName: "",
+    uti: "public.heic",
+    mimeType: "image/heic",
+    totalBytes: 10,
+    isSticker: false,
+    originalPath: "/Users/test/Library/Messages/Attachments/photo.heic",
+    missing: false
+  )
+  #expect(WebServer.shouldExposePreview(for: heic) == true)
+
+  let mov = AttachmentMeta(
+    rowID: 2,
+    filename: "clip.mov",
+    transferName: "",
+    uti: "com.apple.quicktime-movie",
+    mimeType: "video/quicktime",
+    totalBytes: 10,
+    isSticker: false,
+    originalPath: "/Users/test/Library/Messages/Attachments/clip.mov",
+    missing: false
+  )
+  #expect(WebServer.shouldExposePreview(for: mov) == true)
+
+  let mp4 = AttachmentMeta(
+    rowID: 3,
+    filename: "clip.mp4",
+    transferName: "",
+    uti: "public.mpeg-4",
+    mimeType: "video/mp4",
+    totalBytes: 10,
+    isSticker: false,
+    originalPath: "/Users/test/Library/Messages/Attachments/clip.mp4",
+    missing: false
+  )
+  #expect(WebServer.shouldExposePreview(for: mp4) == false)
 }

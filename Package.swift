@@ -45,6 +45,9 @@ let package = Package(
         ],
         linkerSettings: [
             .linkedFramework("Contacts"),
+            .linkedFramework("CoreGraphics"),
+            .linkedFramework("ImageIO"),
+            .linkedFramework("QuickLookThumbnailing"),
             .unsafeFlags([
                 "-Xlinker", "-sectcreate",
                 "-Xlinker", "__TEXT",

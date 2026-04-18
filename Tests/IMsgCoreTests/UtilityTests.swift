@@ -139,6 +139,32 @@ func messageSenderBuildsArguments() throws {
 }
 
 @Test
+func messageSenderFallsBackToSMSForPhoneRecipientsWhenAutoIMessageFails() throws {
+  var invocations: [[String]] = []
+  let sender = MessageSender(runner: { _, args in
+    invocations.append(args)
+
+    if invocations.count == 1 {
+      throw IMsgError.appleScriptFailure("Can’t get buddy +16502530000 of service")
+    }
+  })
+
+  try sender.send(
+    MessageSendOptions(
+      recipient: "+16502530000",
+      text: "hi",
+      attachmentPath: "",
+      service: .auto,
+      region: "US"
+    )
+  )
+
+  #expect(invocations.count == 2)
+  #expect(invocations[0][2] == "imessage")
+  #expect(invocations[1][2] == "sms")
+}
+
+@Test
 func messageSenderUsesChatIdentifier() throws {
   let fileManager = FileManager.default
   let tempDir = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -300,6 +326,31 @@ func messageSenderTreatsHandleIdentifierAsRecipient() throws {
   #expect(captured[0] == "+16502530000")
   #expect(captured[5].isEmpty)
   #expect(captured[6] == "0")
+}
+
+@Test
+func messageSenderPrefersExistingChatGUIDOverHandleIdentifier() throws {
+  var captured: [String] = []
+  let sender = MessageSender(runner: { _, args in
+    captured = args
+  })
+
+  try sender.send(
+    MessageSendOptions(
+      recipient: "",
+      text: "hi",
+      attachmentPath: "",
+      service: .auto,
+      region: "US",
+      chatIdentifier: "+15612600573",
+      chatGUID: "any;-;+15612600573"
+    )
+  )
+
+  #expect(captured[0].isEmpty)
+  #expect(captured[2] == "auto")
+  #expect(captured[5] == "any;-;+15612600573")
+  #expect(captured[6] == "1")
 }
 
 @Test

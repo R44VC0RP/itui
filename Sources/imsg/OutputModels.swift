@@ -40,6 +40,7 @@ struct MessagePayload: Codable {
   let createdAt: String
   let attachments: [AttachmentPayload]
   let reactions: [ReactionPayload]
+  let balloonBundleID: String?
   /// The destination_caller_id from the database. For messages where is_from_me is true,
   /// this can help distinguish between messages actually sent by the local user vs
   /// messages received on a secondary phone number registered with the same Apple ID.
@@ -61,7 +62,8 @@ struct MessagePayload: Codable {
     attachments: [AttachmentMeta],
     reactions: [Reaction] = [],
     senderContact: ResolvedContact? = nil,
-    attachmentURLBuilder: ((Int64) -> String?)? = nil
+    attachmentURLBuilder: ((Int64) -> String?)? = nil,
+    attachmentPreviewURLBuilder: ((Int64) -> String?)? = nil
   ) {
     self.id = message.rowID
     self.chatID = message.chatID
@@ -73,9 +75,16 @@ struct MessagePayload: Codable {
     self.text = message.text
     self.createdAt = CLIISO8601.format(message.date)
     self.attachments = attachments.map {
-      AttachmentPayload(meta: $0, url: attachmentURLBuilder?($0.rowID))
+      AttachmentPayload(
+        meta: $0,
+        url: attachmentURLBuilder?($0.rowID),
+        previewURL: WebServer.shouldExposePreview(for: $0)
+          ? attachmentPreviewURLBuilder?($0.rowID)
+          : nil
+      )
     }
     self.reactions = reactions.map { ReactionPayload(reaction: $0) }
+    self.balloonBundleID = message.balloonBundleID
     self.destinationCallerID = message.destinationCallerID
     self.senderContact = senderContact
 
@@ -107,6 +116,7 @@ struct MessagePayload: Codable {
     case createdAt = "created_at"
     case attachments
     case reactions
+    case balloonBundleID = "balloon_bundle_id"
     case destinationCallerID = "destination_caller_id"
     case isReaction = "is_reaction"
     case reactionType = "reaction_type"
@@ -170,12 +180,15 @@ struct AttachmentPayload: Codable {
   /// when the payload is produced by the embedded web server so other surfaces (CLI, RPC
   /// over stdio) leave it nil and clients fall back to `original_path`.
   let attachmentURL: String?
+  /// Browser-safe derived preview URL for media the browser cannot render directly from
+  /// the raw attachment bytes (for example HEIC/HEIF and QuickTime movies).
+  let previewURL: String?
 
   init(meta: AttachmentMeta) {
-    self.init(meta: meta, url: nil)
+    self.init(meta: meta, url: nil, previewURL: nil)
   }
 
-  init(meta: AttachmentMeta, url: String?) {
+  init(meta: AttachmentMeta, url: String?, previewURL: String?) {
     self.id = meta.rowID
     self.filename = meta.filename
     self.transferName = meta.transferName
@@ -186,6 +199,7 @@ struct AttachmentPayload: Codable {
     self.originalPath = meta.originalPath
     self.missing = meta.missing
     self.attachmentURL = url
+    self.previewURL = previewURL
   }
 
   enum CodingKeys: String, CodingKey {
@@ -199,6 +213,7 @@ struct AttachmentPayload: Codable {
     case originalPath = "original_path"
     case missing = "missing"
     case attachmentURL = "attachment_url"
+    case previewURL = "preview_url"
   }
 }
 
@@ -212,6 +227,7 @@ struct ChatListPayload: Codable {
   let guid: String
   let service: String
   let lastMessageAt: String
+  let preview: String
   let participants: [String]
   let isGroup: Bool
   let participantsResolved: [ResolvedContact]?
@@ -223,6 +239,7 @@ struct ChatListPayload: Codable {
     guid: String,
     service: String,
     lastMessageAt: String,
+    preview: String,
     participants: [String],
     isGroup: Bool,
     participantsResolved: [ResolvedContact]? = nil
@@ -233,13 +250,14 @@ struct ChatListPayload: Codable {
     self.guid = guid
     self.service = service
     self.lastMessageAt = lastMessageAt
+    self.preview = preview
     self.participants = participants
     self.isGroup = isGroup
     self.participantsResolved = participantsResolved
   }
 
   enum CodingKeys: String, CodingKey {
-    case id, name, identifier, guid, service, participants
+    case id, name, identifier, guid, service, preview, participants
     case lastMessageAt = "last_message_at"
     case isGroup = "is_group"
     case participantsResolved = "participants_resolved"
