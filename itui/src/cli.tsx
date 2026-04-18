@@ -204,6 +204,12 @@ function applyConfigKey(patch: Partial<Config>, key: string, value: string): voi
         if (value === "" || value === "null") {
           delete patch.customHeaders[name];
         } else {
+          try {
+            new Headers([[name, value]]);
+          } catch {
+            process.stderr.write(`invalid header ${name}\n`);
+            process.exit(1);
+          }
           patch.customHeaders[name] = value;
         }
         return;
