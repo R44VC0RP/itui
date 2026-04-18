@@ -50,9 +50,9 @@ export function MessagesScreen() {
       />
 
       <Sheet open={sidebar.isOpen} onOpenChange={onSetSidebarOpen}>
-        <div className="min-h-svh bg-background text-foreground">
-          <div className="mx-auto flex h-svh max-w-[1560px] flex-col">
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background/96 lg:flex-row">
+        <div className="min-h-dvh bg-background text-foreground">
+          <div className="mx-auto flex min-h-dvh max-w-[1560px] flex-col lg:h-dvh">
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background lg:flex-row lg:bg-background/96">
               <aside className="hidden max-h-[42svh] min-h-[18rem] w-full flex-col bg-muted/45 lg:flex lg:max-h-none lg:min-h-0 lg:shrink-0 lg:basis-[22rem] lg:max-w-[22rem] xl:basis-[23.5rem] xl:max-w-[23.5rem]">
                 <header className="flex items-center justify-between gap-3 px-4 pt-4 pb-2">
                   <h1 className="truncate text-[18px] font-semibold tracking-tight">
@@ -83,10 +83,10 @@ export function MessagesScreen() {
 
               <Separator className="hidden lg:block" orientation="vertical" />
 
-              <section className="flex min-w-0 flex-1 flex-col bg-background/90">
-                <header className="px-4 py-3 sm:px-5">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex min-w-0 items-center gap-3">
+              <section className="flex min-w-0 flex-1 flex-col bg-background lg:bg-background/90">
+                <header className="px-3 py-3 sm:px-5">
+                  <div className="flex items-center justify-between gap-2 sm:gap-3">
+                    <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
                       <SheetTrigger asChild>
                         <Button
                           aria-label="Open conversations"
@@ -101,7 +101,7 @@ export function MessagesScreen() {
                       {activeConversation ? (
                         <button
                           aria-label="Open conversation details"
-                          className="flex min-w-0 items-center gap-3 rounded-xl px-1 py-1 text-left transition-colors hover:bg-muted/55"
+                          className="flex min-w-0 items-center gap-2.5 rounded-xl px-1 py-1 text-left transition-colors hover:bg-muted/55 sm:gap-3"
                           onClick={() => setIsDetailsOpen(true)}
                           type="button"
                         >
@@ -210,7 +210,7 @@ export function MessagesScreen() {
 
             <SheetContent
               side="left"
-              className="w-[88vw] max-w-[360px] bg-muted/55 p-0"
+              className="w-[88vw] max-w-[360px] bg-background p-0 sm:bg-muted/55"
             >
               <SheetHeader className="border-b px-4 pt-4 pb-3">
                 <SheetTitle className="text-[18px] font-semibold tracking-tight">

@@ -46,6 +46,14 @@ dev-server ports). Override with `--port` on the CLI or `ITUI_PORT=...` during
 install. For non-interactive installs (e.g. `curl | bash`), set
 `ITUI_INSTALL_DAEMON=1` to install the LaunchAgent without prompting.
 
+To update an existing install, run the same installer command again:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/R44VC0RP/itui/main/install.sh | bash
+```
+
+You do not need to clone the repo or use `git` for normal installs or updates.
+
 ### Requirements
 
 **Server / browser runtime (macOS only)**
@@ -71,6 +79,16 @@ http://127.0.0.1:13197
 ```
 
 If you plan to launch `imsg serve` over SSH or another background context, run it once locally first so macOS can show the Contacts and Automation permission prompts.
+
+If you accepted the LaunchAgent install during setup, `imsg serve` should start automatically on login. The most useful service commands are:
+
+```bash
+# restart the background service
+launchctl kickstart -k gui/$(id -u)/com.r44vc0rp.itui.imsg
+
+# inspect status
+launchctl print gui/$(id -u)/com.r44vc0rp.itui.imsg
+```
 
 ### Optional Tailscale Serve
 

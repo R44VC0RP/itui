@@ -141,7 +141,7 @@ function MessageAttachments({
 
   return (
     <>
-      <div className="flex w-full max-w-[23rem] flex-col gap-2">
+      <div className="flex w-full max-w-[min(23rem,calc(100vw-5.75rem))] flex-col gap-2 sm:max-w-[23rem]">
         {imageAttachments.length > 0 ? (
           <div
             className={cn(
@@ -440,7 +440,7 @@ function LinkifiedMessageText({
   const parts = text.split(textUrlPattern)
 
   return (
-    <span className={cn("break-words", className)}>
+    <span className={cn("break-words [overflow-wrap:anywhere]", className)}>
       {parts.map((part, index) => {
         if (!part) {
           return null
@@ -452,7 +452,7 @@ function LinkifiedMessageText({
 
         return (
           <a
-            className="font-medium underline decoration-white/45 underline-offset-3 transition-colors hover:decoration-current"
+            className="break-all font-medium underline decoration-white/45 underline-offset-3 transition-colors [overflow-wrap:anywhere] hover:decoration-current"
             href={part}
             key={`${part}-${index}`}
             rel="noreferrer"
@@ -508,7 +508,7 @@ function MessageActionsMenu({
       <DropdownMenuTrigger asChild>
         <Button
           aria-label="Message actions"
-          className="opacity-70 transition-opacity sm:opacity-0 sm:group-hover/message:opacity-100 sm:focus-within:opacity-100"
+          className="shrink-0 self-start opacity-70 transition-opacity sm:opacity-0 sm:group-hover/message:opacity-100 sm:focus-within:opacity-100"
           size="icon-sm"
           type="button"
           variant="ghost"
@@ -641,13 +641,13 @@ export function MessageContent({
     >
       <div
         className={cn(
-          "group/message flex max-w-full items-start gap-1",
+          "group/message flex max-w-full items-start gap-0.5 sm:gap-1",
           message.is_from_me ? "flex-row-reverse" : "flex-row"
         )}
       >
         <div
           className={cn(
-            "flex min-w-0 flex-col gap-1.5",
+            "flex min-w-0 flex-1 flex-col gap-1.5",
             message.is_from_me ? "items-end" : "items-start"
           )}
         >
@@ -656,7 +656,7 @@ export function MessageContent({
           {showBubble ? (
             <div
               className={cn(
-                "max-w-full rounded-[1.35rem] px-4 py-2.5 text-[15px] leading-6 whitespace-pre-wrap shadow-[0_1px_0_hsl(var(--foreground)/0.02)]",
+                "w-fit max-w-full rounded-[1.35rem] px-4 py-2.5 text-[15px] leading-6 whitespace-pre-wrap [overflow-wrap:anywhere] shadow-[0_1px_0_hsl(var(--foreground)/0.02)]",
                 message.is_from_me
                   ? outgoingBubbleClass(service)
                   : "bg-secondary text-foreground"

@@ -47,7 +47,10 @@ export function ConversationThread({
   selectedMessages: ConversationMessage[]
 }) {
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto" ref={scrollRef}>
+    <div
+      className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain bg-background"
+      ref={scrollRef}
+    >
       {!activeConversation ? (
         <div className="mx-auto flex h-full max-w-md flex-col items-center justify-center gap-3 px-6 text-center">
           {isLoadingChats ? (
@@ -118,7 +121,7 @@ export function ConversationThread({
           </div>
         </div>
       ) : (
-        <div className="mx-auto flex w-full max-w-3xl flex-col gap-3.5 px-4 py-6 sm:px-6">
+        <div className="mx-auto flex w-full max-w-3xl flex-col gap-3 px-3 py-5 sm:gap-3.5 sm:px-6 sm:py-6">
           {selectedMessages.map((message, index) => {
             const previousMessage = selectedMessages[index - 1]
             const nextMessage = selectedMessages[index + 1]
@@ -154,12 +157,12 @@ export function ConversationThread({
 
                 <div
                   className={cn(
-                    "flex gap-2.5",
+                    "flex gap-2",
                     message.is_from_me ? "justify-end" : "justify-start"
                   )}
                 >
                   {message.is_from_me ? (
-                    <div className="flex max-w-[82%] flex-col items-end gap-1 sm:max-w-[72%]">
+                    <div className="flex max-w-[min(84vw,24rem)] flex-col items-end gap-1 sm:max-w-[72%]">
                       <MessageContent
                         message={message}
                         onRetryMessage={onRetryMessage}
@@ -173,8 +176,8 @@ export function ConversationThread({
                       ) : null}
                     </div>
                   ) : (
-                    <div className="flex max-w-[82%] flex-col gap-1 sm:max-w-[72%]">
-                      <div className="flex items-start gap-2.5">
+                    <div className="flex max-w-[min(84vw,24rem)] flex-col gap-1 sm:max-w-[72%]">
+                      <div className="flex items-start gap-2 sm:gap-2.5">
                         {showAvatar ? (
                           <ThreadAvatar
                             contacts={incomingAvatarContacts(
