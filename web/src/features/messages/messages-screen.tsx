@@ -50,8 +50,8 @@ export function MessagesScreen() {
       />
 
       <Sheet open={sidebar.isOpen} onOpenChange={onSetSidebarOpen}>
-        <div className="min-h-dvh bg-background text-foreground">
-          <div className="mx-auto flex min-h-dvh max-w-[1560px] flex-col lg:h-dvh">
+        <div className="h-dvh overflow-hidden bg-background text-foreground">
+          <div className="mx-auto flex h-full max-w-[1560px] flex-col">
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background lg:flex-row lg:bg-background/96">
               <aside className="hidden max-h-[42svh] min-h-[18rem] w-full flex-col bg-muted/45 lg:flex lg:max-h-none lg:min-h-0 lg:shrink-0 lg:basis-[22rem] lg:max-w-[22rem] xl:basis-[23.5rem] xl:max-w-[23.5rem]">
                 <header className="flex items-center justify-between gap-3 px-4 pt-4 pb-2">
@@ -83,8 +83,8 @@ export function MessagesScreen() {
 
               <Separator className="hidden lg:block" orientation="vertical" />
 
-              <section className="flex min-w-0 flex-1 flex-col bg-background lg:bg-background/90">
-                <header className="px-3 py-3 sm:px-5">
+              <section className="flex min-h-0 min-w-0 flex-1 flex-col bg-background lg:bg-background/90">
+                <header className="sticky top-0 z-20 shrink-0 bg-background/96 px-3 py-3 backdrop-blur-sm sm:px-5 lg:static lg:bg-transparent lg:px-5 lg:py-3 lg:backdrop-blur-0">
                   <div className="flex items-center justify-between gap-2 sm:gap-3">
                     <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
                       <SheetTrigger asChild>
