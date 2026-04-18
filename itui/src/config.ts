@@ -24,6 +24,10 @@ export interface Config {
   /** Play a sound with the notification. On Omarchy this uses freedesktop sound names
    * via `canberra-gtk-play`; on macOS it uses the system notification sound. */
   notificationSound: boolean;
+  /** Extra HTTP headers sent with every API and SSE request. Useful for proxies that
+   * require authentication, e.g. Cloudflare Access service tokens:
+   *   { "CF-Access-Client-Id": "xxx", "CF-Access-Client-Secret": "yyy" } */
+  customHeaders: Record<string, string>;
 }
 
 export const DEFAULT_CONFIG: Config = {
@@ -34,6 +38,7 @@ export const DEFAULT_CONFIG: Config = {
   hideHandles: true,
   notifications: true,
   notificationSound: true,
+  customHeaders: {},
 };
 
 /**

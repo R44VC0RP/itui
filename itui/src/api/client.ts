@@ -20,9 +20,10 @@ export class APIError extends Error {
 export class ImsgClient {
   constructor(private config: Config) {}
 
-  private headers(): Record<string, string> {
-    const h: Record<string, string> = { Accept: "application/json" };
-    if (this.config.token) h.Authorization = `Bearer ${this.config.token}`;
+  private headers(): Headers {
+    const h = new Headers(this.config.customHeaders);
+    h.set("Accept", "application/json");
+    if (this.config.token) h.set("Authorization", `Bearer ${this.config.token}`);
     return h;
   }
 
@@ -62,9 +63,11 @@ export class ImsgClient {
     if (opts.chatId != null) body.chat_id = opts.chatId;
     if (opts.chatGuid) body.chat_guid = opts.chatGuid;
     if (opts.chatIdentifier) body.chat_identifier = opts.chatIdentifier;
+    const headers = this.headers();
+    headers.set("Content-Type", "application/json");
     const res = await fetch(url, {
       method: "POST",
-      headers: { ...this.headers(), "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify(body),
     });
     if (!res.ok) throw new APIError(res.status, url, await res.text());
