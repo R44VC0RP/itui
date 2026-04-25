@@ -21,8 +21,9 @@ public enum IMsgError: LocalizedError, Sendable {
 
         To fix:
         1. Open System Settings → Privacy & Security → Full Disk Access
-        2. Add your terminal application (Terminal.app, iTerm, etc.)
-        3. Restart your terminal
+        2. Add the app, shell, or daemon binary that launched imsg
+           (for example: Terminal/iTerm for manual runs, or ~/.itui/bin/imsg for LaunchAgent mode)
+        3. Restart that app or relaunch the daemon
         4. Try again
 
         Note: This is required because macOS protects the Messages database.

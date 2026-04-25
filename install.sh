@@ -73,6 +73,7 @@ list_lan_ipv4() {
   '
 }
 INSTALL_DIR="${ITUI_INSTALL_DIR:-$HOME/.itui}"
+MANUAL_PID_FILE="$INSTALL_DIR/imsg.manual.pid"
 
 # Non-generic default port chosen to avoid collisions with common dev servers
 # (3000, 4000, 5000, 5173, 8000, 8080, 8888, 9000, etc.). Users can override
@@ -321,6 +322,15 @@ install_daemon() {
 
   mkdir -p "$(dirname "$DAEMON_PLIST")"
   mkdir -p "$DAEMON_LOG_DIR"
+
+  if [[ -f "$MANUAL_PID_FILE" ]]; then
+    local manual_pid
+    manual_pid="$(cat "$MANUAL_PID_FILE" 2>/dev/null || true)"
+    if [[ -n "$manual_pid" ]]; then
+      kill "$manual_pid" 2>/dev/null || true
+    fi
+    rm -f "$MANUAL_PID_FILE"
+  fi
 
   # If an older version of the plist is already loaded, unload it so we can
   # update ProgramArguments (port, binary path, etc.) cleanly. Booting out via
