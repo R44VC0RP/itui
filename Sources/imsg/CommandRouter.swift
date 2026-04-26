@@ -18,6 +18,7 @@ struct CommandRouter {
       ContactsCommand.spec,
       RpcCommand.spec,
       ServeCommand.spec,
+      ServiceCommand.spec,
     ]
     let descriptor = CommandDescriptor(
       name: rootName,

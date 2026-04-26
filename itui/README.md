@@ -42,30 +42,41 @@ On first launch, itui creates `~/.config/itui/config.json` with defaults:
 Point it at a different server:
 
 ```sh
-itui config set server=http://mac-mini.local:13197
+itui config set server=http://imsg-host.local:13197
 ```
 
 Or for a single run:
 
 ```sh
-itui --server=http://mac-mini.local:13197
+itui --server=http://imsg-host.local:13197
 ```
 
 ## Remote usage
 
-The iMessage server (`imsg serve`) runs on your Mac. To reach it from another machine,
-either expose it on a trusted network or tunnel in over SSH:
+The iMessage server (`imsg serve`) runs on your Mac. For a normal installed
+server, check it with:
+
+```sh
+imsg service status
+```
+
+To reach it from another machine, use Tailscale Serve or tunnel in over SSH:
+
+```sh
+tailscale serve --bg 13197
+tailscale serve status
+```
 
 ```sh
 # From your laptop, tunnel :13197 on the Mac to localhost:13197
-ssh -N -L 13197:127.0.0.1:13197 you@mac-mini.local
+ssh -N -L 13197:127.0.0.1:13197 user@your-hostname
 
 # In another terminal on the laptop
 itui
 ```
 
 > The imsg server does not currently require auth. `token` is plumbed through for when it
-> does. Until then, don't expose the server directly on the public internet — tunnel it.
+> does. Until then, don't expose the server directly on the public internet.
 
 ## Keys
 

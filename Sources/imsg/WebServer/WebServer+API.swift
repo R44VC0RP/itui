@@ -10,6 +10,7 @@ extension WebServer {
     let localCache = cache
     let localSendMessage = sendMessage
     let localContactResolver = contactResolver
+    let localUploadStager = uploadStager
 
     registerStaticRoutes(router: router)
 
@@ -45,6 +46,7 @@ extension WebServer {
             guid: guid,
             service: service,
             lastMessageAt: CLIISO8601.format(chat.lastMessageAt),
+            preview: chat.preview,
             participants: participants,
             isGroup: guid.contains(";+;") || identifier.contains(";+;"),
             participantsResolved: resolvedParticipants
@@ -91,7 +93,12 @@ extension WebServer {
         delivery: delivery
       )
 
-      let urlBuilder: @Sendable (Int64) -> String? = { id in WebServer.attachmentURLPath(id: id) }
+      let attachmentURLBuilder: @Sendable (Int64) -> String? = { id in
+        WebServer.attachmentURLPath(id: id)
+      }
+      let previewURLBuilder: @Sendable (Int64) -> String? = { id in
+        WebServer.attachmentPreviewURLPath(id: id)
+      }
       for message in messages.reversed() {
         let attachments = attachmentsMap[message.rowID] ?? []
         let reactions = reactionsMap[message.rowID] ?? []
@@ -102,11 +109,52 @@ extension WebServer {
             attachments: attachments,
             reactions: reactions,
             senderContact: contact,
-            attachmentURLBuilder: urlBuilder
+            attachmentURLBuilder: attachmentURLBuilder,
+            attachmentPreviewURLBuilder: previewURLBuilder
           ))
       }
 
       return Self.jsonResponse(MessagesListResponse(messages: payloads))
+    }
+
+    api.post("uploads") { request, _ -> Response in
+      let filename = Self.queryString(request: request, name: "filename") ?? "attachment"
+      let mimeType = request.headers[.contentType] ?? "application/octet-stream"
+
+      let body: ByteBuffer
+      do {
+        body = try await request.body.collect(upTo: WebServer.maxUploadBytes)
+      } catch {
+        return Self.errorResponse(status: .contentTooLarge, message: "upload is too large")
+      }
+
+      let data = Data(buffer: body)
+      if data.isEmpty {
+        return Self.errorResponse(status: .badRequest, message: "upload body is empty")
+      }
+
+      do {
+        let upload = try await localUploadStager.stage(
+          data: data,
+          filename: filename,
+          mimeType: mimeType
+        )
+        return Self.jsonResponse(StagedUploadResponse(upload: StagedUploadPayload(upload: upload)))
+      } catch {
+        return Self.errorResponse(
+          status: .internalServerError,
+          message: String(describing: error)
+        )
+      }
+    }
+
+    api.delete("uploads/:id") { _, context -> Response in
+      guard let uploadID = context.parameters.get("id"), UUID(uuidString: uploadID) != nil else {
+        return Self.errorResponse(status: .badRequest, message: "invalid upload id")
+      }
+
+      await localUploadStager.remove(id: uploadID)
+      return Self.jsonResponse(OkResponse(ok: true))
     }
 
     api.post("send") { request, _ -> Response in
@@ -118,6 +166,7 @@ extension WebServer {
 
       let text = stringParam(json["text"]) ?? ""
       let file = stringParam(json["file"]) ?? ""
+      let uploadID = stringParam(json["upload_id"]) ?? ""
       let serviceRaw = stringParam(json["service"]) ?? "auto"
       let region = stringParam(json["region"]) ?? "US"
 
@@ -141,13 +190,33 @@ extension WebServer {
         return Self.errorResponse(
           status: .badRequest, message: "use to or chat_*; not both")
       }
+      if !file.isEmpty && !uploadID.isEmpty {
+        return Self.errorResponse(
+          status: .badRequest, message: "use file or upload_id; not both")
+      }
       if !input.hasChatTarget && input.recipient.isEmpty {
         return Self.errorResponse(
           status: .badRequest, message: "to is required for direct sends")
       }
-      if text.isEmpty && file.isEmpty {
+      var attachmentPath = file
+      if !uploadID.isEmpty {
+        do {
+          attachmentPath = try await localUploadStager.filePath(for: uploadID)
+        } catch let error as UploadStager.UploadError {
+          return Self.errorResponse(
+            status: .notFound,
+            message: error.localizedDescription
+          )
+        } catch {
+          return Self.errorResponse(
+            status: .internalServerError,
+            message: String(describing: error)
+          )
+        }
+      }
+      if text.isEmpty && attachmentPath.isEmpty {
         return Self.errorResponse(
-          status: .badRequest, message: "text or file is required")
+          status: .badRequest, message: "text or attachment is required")
       }
 
       let resolvedTarget = try await ChatTargetResolver.resolveChatTarget(
@@ -158,17 +227,32 @@ extension WebServer {
         }
       )
 
-      try localSendMessage(
-        MessageSendOptions(
-          recipient: input.recipient,
-          text: text,
-          attachmentPath: file,
-          service: service,
-          region: region,
-          chatIdentifier: resolvedTarget.chatIdentifier,
-          chatGUID: resolvedTarget.chatGUID
+      defer {
+        if !uploadID.isEmpty {
+          Task {
+            await localUploadStager.remove(id: uploadID)
+          }
+        }
+      }
+
+      do {
+        try localSendMessage(
+          MessageSendOptions(
+            recipient: input.recipient,
+            text: text,
+            attachmentPath: attachmentPath,
+            service: service,
+            region: region,
+            chatIdentifier: resolvedTarget.chatIdentifier,
+            chatGUID: resolvedTarget.chatGUID
+          )
         )
-      )
+      } catch {
+        return Self.errorResponse(
+          status: .internalServerError,
+          message: String(describing: error)
+        )
+      }
 
       return Self.jsonResponse(OkResponse(ok: true))
     }
@@ -233,8 +317,70 @@ extension WebServer {
 
     // MARK: Attachments
 
+    // Stream a browser-safe derived preview for media the browser cannot render directly
+    // from the stored bytes (for example HEIC/HEIF images, sticker assets, and QuickTime
+    // movies). The handler still refuses anything outside the Messages media directories.
+    api.get("attachments/:id/preview") { _, context -> Response in
+      guard let idStr = context.parameters.get("id"),
+        let rowID = Int64(idStr)
+      else {
+        return Self.errorResponse(status: .badRequest, message: "invalid attachment id")
+      }
+      guard let meta = try localStore.attachment(id: rowID) else {
+        return Self.errorResponse(status: .notFound, message: "attachment not found")
+      }
+      if meta.missing || meta.originalPath.isEmpty {
+        return Self.errorResponse(status: .notFound, message: "attachment file missing")
+      }
+      guard WebServer.isInsideMessagesMediaDirectory(path: meta.originalPath) else {
+        return Self.errorResponse(
+          status: .forbidden,
+          message: "attachment path outside Messages directory"
+        )
+      }
+      guard WebServer.shouldExposePreview(for: meta) else {
+        return Self.errorResponse(
+          status: .unsupportedMediaType,
+          message: "attachment preview not available"
+        )
+      }
+
+      do {
+        let preview = try await AttachmentPreviewer.previewData(for: meta)
+        let sourceURL = URL(fileURLWithPath: meta.originalPath)
+        let baseName = Self.displayFilename(for: meta, sourceURL: sourceURL)
+        let previewName = ((baseName as NSString).deletingPathExtension as NSString)
+          .appendingPathExtension("png") ?? "attachment-preview.png"
+
+        var headers = HTTPFields()
+        headers.append(HTTPField(name: .contentType, value: preview.mimeType))
+        headers.append(HTTPField(name: .cacheControl, value: "private, max-age=3600"))
+        headers.append(
+          HTTPField(
+            name: .contentDisposition,
+            value: "inline; filename=\"\(Self.sanitizeHeaderValue(previewName))\""
+          ))
+
+        return Response(
+          status: .ok,
+          headers: headers,
+          body: .init(byteBuffer: ByteBuffer(bytes: preview.data))
+        )
+      } catch AttachmentPreviewError.generationFailed {
+        return Self.errorResponse(
+          status: .unsupportedMediaType,
+          message: "attachment preview not available"
+        )
+      } catch {
+        return Self.errorResponse(
+          status: .internalServerError,
+          message: String(describing: error)
+        )
+      }
+    }
+
     // Stream the raw bytes of an attachment by its DB row id. The handler refuses to serve
-    // anything not inside `~/Library/Messages/Attachments/` even if the DB somehow points
+    // anything not inside the Messages media directories even if the DB somehow points
     // elsewhere, so clients can never coerce the server into serving arbitrary files.
     api.get("attachments/:id") { _, context -> Response in
       guard let idStr = context.parameters.get("id"),
@@ -248,7 +394,7 @@ extension WebServer {
       if meta.missing || meta.originalPath.isEmpty {
         return Self.errorResponse(status: .notFound, message: "attachment file missing")
       }
-      guard Self.isInsideMessagesAttachments(path: meta.originalPath) else {
+      guard WebServer.isInsideMessagesMediaDirectory(path: meta.originalPath) else {
         return Self.errorResponse(status: .forbidden, message: "attachment path outside Messages directory")
       }
 
@@ -262,7 +408,7 @@ extension WebServer {
       headers.append(HTTPField(name: .contentType, value: mime))
       headers.append(HTTPField(name: .cacheControl, value: "private, max-age=3600"))
       // Offer a reasonable filename so "Save As" in a browser picks up the original name.
-      let filename = meta.transferName.isEmpty ? url.lastPathComponent : meta.transferName
+      let filename = Self.displayFilename(for: meta, sourceURL: url)
       headers.append(
         HTTPField(
           name: .contentDisposition,
@@ -328,7 +474,8 @@ extension WebServer {
               attachments: attachments,
               reactions: reactions,
               senderContact: senderContact,
-              attachmentURLBuilder: { id in WebServer.attachmentURLPath(id: id) }
+              attachmentURLBuilder: { id in WebServer.attachmentURLPath(id: id) },
+              attachmentPreviewURLBuilder: { id in WebServer.attachmentPreviewURLPath(id: id) }
             )
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.withoutEscapingSlashes]
@@ -357,13 +504,9 @@ extension WebServer {
     return router
   }
 
-  private static func isInsideMessagesAttachments(path: String) -> Bool {
-    // Resolve symlinks and relative components so `.././../etc/passwd` can't sneak through.
-    let expanded = (path as NSString).standardizingPath
-    let home = NSHomeDirectory()
-    let base = (home as NSString).appendingPathComponent("Library/Messages/Attachments")
-    let normalizedBase = (base as NSString).standardizingPath
-    return expanded.hasPrefix(normalizedBase + "/") || expanded == normalizedBase
+  private static func displayFilename(for meta: AttachmentMeta, sourceURL: URL) -> String {
+    let transferName = meta.transferName.trimmingCharacters(in: .whitespacesAndNewlines)
+    return transferName.isEmpty ? sourceURL.lastPathComponent : transferName
   }
 
   private static func sanitizeHeaderValue(_ value: String) -> String {
@@ -450,6 +593,31 @@ struct MessagesListResponse: Codable {
 
 struct OkResponse: Codable {
   let ok: Bool
+}
+
+struct StagedUploadResponse: Codable {
+  let upload: StagedUploadPayload
+}
+
+struct StagedUploadPayload: Codable {
+  let id: String
+  let filename: String
+  let mimeType: String
+  let totalBytes: Int64
+
+  init(upload: UploadStager.Upload) {
+    self.id = upload.id
+    self.filename = upload.filename
+    self.mimeType = upload.mimeType
+    self.totalBytes = upload.totalBytes
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case id
+    case filename
+    case mimeType = "mime_type"
+    case totalBytes = "total_bytes"
+  }
 }
 
 /// Legacy response shape kept for the existing web UI. Returned only when

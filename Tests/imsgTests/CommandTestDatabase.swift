@@ -121,7 +121,7 @@ enum CommandTestDatabase {
       VALUES (1, 'iMessage;+;chat123', 'iMessage;+;chat123', 'Group Chat', 'iMessage')
       """
     )
-    try db.run("INSERT INTO handle(ROWID, id) VALUES (1, '+123'), (2, 'me@icloud.com')")
+    try db.run("INSERT INTO handle(ROWID, id) VALUES (1, '+123'), (2, 'me@example.com')")
     try db.run("INSERT INTO chat_handle_join(chat_id, handle_id) VALUES (1, 1), (1, 2)")
     try db.run(
       """

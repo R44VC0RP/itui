@@ -1,0 +1,229 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/inter";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-heading: var(--font-sans);
+  --font-sans: "Inter Variable", sans-serif;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  --app-font-scale: 1;
+  --app-text-screen-title: 1.125rem;
+  --app-leading-screen-title: 1.5rem;
+  --app-text-header-title: 1.0625rem;
+  --app-leading-header-title: 1.4375rem;
+  --app-text-header-meta: 0.75rem;
+  --app-leading-header-meta: 1rem;
+  --app-text-sidebar-title: 0.9375rem;
+  --app-leading-sidebar-title: 1.25rem;
+  --app-text-sidebar-preview: 0.8125rem;
+  --app-leading-sidebar-preview: 1.25rem;
+  --app-text-supporting: 0.875rem;
+  --app-leading-supporting: 1.25rem;
+  --app-text-message: 0.9375rem;
+  --app-leading-message: 1.5rem;
+  --app-text-meta: 0.6875rem;
+  --app-leading-meta: 1rem;
+  --app-text-day-divider: 0.625rem;
+  --app-leading-day-divider: 0.875rem;
+  --background: oklch(0.985 0.004 240);
+  --foreground: oklch(0.245 0.014 248);
+  --card: oklch(0.995 0.002 240);
+  --card-foreground: oklch(0.245 0.014 248);
+  --popover: oklch(0.995 0.002 240);
+  --popover-foreground: oklch(0.245 0.014 248);
+  --primary: #0a84ff;
+  --primary-foreground: #ffffff;
+  --secondary: oklch(0.948 0.006 248);
+  --secondary-foreground: oklch(0.287 0.015 248);
+  --muted: oklch(0.958 0.004 248);
+  --muted-foreground: oklch(0.538 0.015 248);
+  --accent: oklch(0.958 0.004 248);
+  --accent-foreground: oklch(0.287 0.015 248);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.91 0.007 248);
+  --input: oklch(0.91 0.007 248);
+  --ring: #0a84ff;
+  --message-imessage: #0a84ff;
+  --message-imessage-foreground: #ffffff;
+  --message-rcs: #3aa0c8;
+  --message-rcs-foreground: #ffffff;
+  --message-sms: #34c759;
+  --message-sms-foreground: #ffffff;
+  --selection-background: #cfe4ff;
+  --selection-foreground: #11304d;
+  --chart-1: oklch(0.869 0.005 56.366);
+  --chart-2: oklch(0.553 0.013 58.071);
+  --chart-3: oklch(0.444 0.011 73.639);
+  --chart-4: oklch(0.374 0.01 67.558);
+  --chart-5: oklch(0.268 0.007 34.298);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.982 0.004 248);
+  --sidebar-foreground: oklch(0.245 0.014 248);
+  --sidebar-primary: #0a84ff;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: oklch(0.958 0.004 248);
+  --sidebar-accent-foreground: oklch(0.287 0.015 248);
+  --sidebar-border: oklch(0.91 0.007 248);
+  --sidebar-ring: #0a84ff;
+}
+
+.dark {
+  --background: oklch(0.19 0.01 248);
+  --foreground: oklch(0.97 0.003 248);
+  --card: oklch(0.225 0.011 248);
+  --card-foreground: oklch(0.97 0.003 248);
+  --popover: oklch(0.225 0.011 248);
+  --popover-foreground: oklch(0.97 0.003 248);
+  --primary: #0a84ff;
+  --primary-foreground: #ffffff;
+  --secondary: oklch(0.265 0.012 248);
+  --secondary-foreground: oklch(0.97 0.003 248);
+  --muted: oklch(0.245 0.011 248);
+  --muted-foreground: oklch(0.73 0.011 248);
+  --accent: oklch(0.245 0.011 248);
+  --accent-foreground: oklch(0.97 0.003 248);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(0.335 0.01 248 / 80%);
+  --input: oklch(0.335 0.01 248 / 80%);
+  --ring: #0a84ff;
+  --message-imessage: #0a84ff;
+  --message-imessage-foreground: #ffffff;
+  --message-rcs: #5cc8ff;
+  --message-rcs-foreground: #000000;
+  --message-sms: #34c759;
+  --message-sms-foreground: #ffffff;
+  --selection-background: #0a84ff;
+  --selection-foreground: #ffffff;
+  --chart-1: oklch(0.869 0.005 56.366);
+  --chart-2: oklch(0.553 0.013 58.071);
+  --chart-3: oklch(0.444 0.011 73.639);
+  --chart-4: oklch(0.374 0.01 67.558);
+  --chart-5: oklch(0.268 0.007 34.298);
+  --sidebar: oklch(0.215 0.011 248);
+  --sidebar-foreground: oklch(0.97 0.003 248);
+  --sidebar-primary: #0a84ff;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: oklch(0.245 0.011 248);
+  --sidebar-accent-foreground: oklch(0.97 0.003 248);
+  --sidebar-border: oklch(0.335 0.01 248 / 80%);
+  --sidebar-ring: #0a84ff;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply text-foreground antialiased;
+
+    background:
+      radial-gradient(
+        circle at top left,
+        color-mix(in oklab, var(--primary) 12%, transparent),
+        transparent 28%
+      ),
+      linear-gradient(
+        180deg,
+        color-mix(in oklab, var(--background) 96%, var(--primary) 4%),
+        var(--background)
+      );
+  }
+  html {
+    @apply font-sans;
+    font-size: calc(16px * var(--app-font-scale));
+  }
+  ::selection {
+    color: var(--selection-foreground);
+    background: var(--selection-background);
+  }
+}
+
+@layer utilities {
+  .text-app-screen-title {
+    font-size: var(--app-text-screen-title);
+    line-height: var(--app-leading-screen-title);
+  }
+
+  .text-app-header-title {
+    font-size: var(--app-text-header-title);
+    line-height: var(--app-leading-header-title);
+  }
+
+  .text-app-header-meta {
+    font-size: var(--app-text-header-meta);
+    line-height: var(--app-leading-header-meta);
+  }
+
+  .text-app-sidebar-title {
+    font-size: var(--app-text-sidebar-title);
+    line-height: var(--app-leading-sidebar-title);
+  }
+
+  .text-app-sidebar-preview {
+    font-size: var(--app-text-sidebar-preview);
+    line-height: var(--app-leading-sidebar-preview);
+  }
+
+  .text-app-supporting {
+    font-size: var(--app-text-supporting);
+    line-height: var(--app-leading-supporting);
+  }
+
+  .text-app-message {
+    font-size: var(--app-text-message);
+    line-height: var(--app-leading-message);
+  }
+
+  .text-app-meta {
+    font-size: var(--app-text-meta);
+    line-height: var(--app-leading-meta);
+  }
+
+  .text-app-day-divider {
+    font-size: var(--app-text-day-divider);
+    line-height: var(--app-leading-day-divider);
+  }
+}

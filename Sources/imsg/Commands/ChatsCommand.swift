@@ -58,6 +58,7 @@ enum ChatsCommand {
             guid: "",
             service: chat.service,
             lastMessageAt: CLIISO8601.format(chat.lastMessageAt),
+            preview: chat.preview,
             participants: participants,
             isGroup: chat.identifier.contains(";+;"),
             participantsResolved: resolved

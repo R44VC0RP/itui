@@ -8,6 +8,7 @@ func chatPayload(
   name: String,
   service: String,
   lastMessageAt: Date,
+  preview: String,
   participants: [String],
   participantsResolved: [ResolvedContact]? = nil
 ) -> [String: Any] {
@@ -18,6 +19,7 @@ func chatPayload(
     "name": name,
     "service": service,
     "last_message_at": CLIISO8601.format(lastMessageAt),
+    "preview": preview,
     "participants": participants,
     "is_group": isGroupHandle(identifier: identifier, guid: guid),
   ]

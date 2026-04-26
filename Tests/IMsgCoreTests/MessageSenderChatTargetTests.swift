@@ -40,14 +40,14 @@ private final class TestMessageSender {
   private func resolveChatTarget(_ options: inout MessageSendOptions) -> String {
     let guid = options.chatGUID.trimmingCharacters(in: .whitespacesAndNewlines)
     let identifier = options.chatIdentifier.trimmingCharacters(in: .whitespacesAndNewlines)
+    if !guid.isEmpty {
+      return guid
+    }
     if !identifier.isEmpty && looksLikeHandle(identifier) {
       if options.recipient.isEmpty {
         options.recipient = identifier
       }
       return ""
-    }
-    if !guid.isEmpty {
-      return guid
     }
     if identifier.isEmpty {
       return ""
@@ -79,6 +79,25 @@ func messageSenderPrefersHandleWhenChatIdentifierLooksLikeHandle() throws {
     region: "US",
     chatIdentifier: "imessage:+15551234567",
     chatGUID: "iMessage;+;chat123"
+  )
+  let captured = try sender.send(options)
+
+  #expect(captured[5] == "iMessage;+;chat123")
+  #expect(captured[6] == "1")
+  #expect(captured[0].isEmpty)
+}
+
+@Test
+func messageSenderUsesHandleWhenNoChatGUIDExists() throws {
+  let sender = TestMessageSender()
+  let options = MessageSendOptions(
+    recipient: "",
+    text: "hi",
+    attachmentPath: "",
+    service: .auto,
+    region: "US",
+    chatIdentifier: "imessage:+15551234567",
+    chatGUID: ""
   )
   let captured = try sender.send(options)
 

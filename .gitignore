@@ -19,10 +19,13 @@ dist/
 # env / secrets
 .env
 .env.*
+!web/.env.example
 
 # Editor
 .idea/
 .vscode/
+.pi/
+plan.md
 
 # Test / coverage
 *.out

@@ -6,12 +6,30 @@ import Testing
 
 final class TestRPCOutput: RPCOutput, @unchecked Sendable {
   private let lock = NSLock()
-  private(set) var responses: [[String: Any]] = []
-  private(set) var errors: [[String: Any]] = []
-  private(set) var notifications: [[String: Any]] = []
+  private var storedResponses: [[String: Any]] = []
+  private var storedErrors: [[String: Any]] = []
+  private var storedNotifications: [[String: Any]] = []
+
+  var responses: [[String: Any]] {
+    lock.lock()
+    defer { lock.unlock() }
+    return storedResponses
+  }
+
+  var errors: [[String: Any]] {
+    lock.lock()
+    defer { lock.unlock() }
+    return storedErrors
+  }
+
+  var notifications: [[String: Any]] {
+    lock.lock()
+    defer { lock.unlock() }
+    return storedNotifications
+  }
 
   func sendResponse(id: Any, result: Any) {
-    record(&responses, value: ["jsonrpc": "2.0", "id": id, "result": result])
+    record(&storedResponses, value: ["jsonrpc": "2.0", "id": id, "result": result])
   }
 
   func sendError(id: Any?, error: RPCError) {
@@ -20,11 +38,14 @@ final class TestRPCOutput: RPCOutput, @unchecked Sendable {
       "id": id ?? NSNull(),
       "error": error.asDictionary(),
     ]
-    record(&errors, value: payload)
+    record(&storedErrors, value: payload)
   }
 
   func sendNotification(method: String, params: Any) {
-    record(&notifications, value: ["jsonrpc": "2.0", "method": method, "params": params])
+    record(
+      &storedNotifications,
+      value: ["jsonrpc": "2.0", "method": method, "params": params]
+    )
   }
 
   private func record(_ bucket: inout [[String: Any]], value: [String: Any]) {
@@ -252,7 +273,7 @@ func rpcWatchSubscribeEmitsNotificationAndUnsubscribe() async throws {
   let server = RPCServer(store: store, verbose: false, output: output)
 
   let subscribe =
-    #"{"jsonrpc":"2.0","id":10,"method":"watch.subscribe","params":{"chat_id":1,"since_rowid":-1}}"#
+    #"{"jsonrpc":"2.0","id":10,"method":"watch.subscribe","params":{"chat_id":1,"since_rowid":-1,"include_contacts":false}}"#
   await server.handleLineForTesting(subscribe)
 
   let result = output.responses.first?["result"] as? [String: Any]

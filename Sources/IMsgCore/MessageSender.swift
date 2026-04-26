@@ -68,14 +68,45 @@ public struct MessageSender {
     if useChat == false {
       if resolved.region.isEmpty { resolved.region = "US" }
       resolved.recipient = normalizer.normalize(resolved.recipient, region: resolved.region)
-      if resolved.service == .auto { resolved.service = .imessage }
     }
 
     if resolved.attachmentPath.isEmpty == false {
       resolved.attachmentPath = try stageAttachment(at: resolved.attachmentPath)
     }
 
+    if useChat == false, resolved.service == .auto {
+      try sendDirectMessageAutomatically(resolved)
+      return
+    }
+
     try sendViaAppleScript(resolved, chatTarget: chatTarget, useChat: useChat)
+  }
+
+  /// Attempts a direct send over iMessage first, then falls back to SMS only when the
+  /// initial failure indicates the recipient is not reachable over iMessage.
+  ///
+  /// SMS fallback on macOS requires Text Message Forwarding / SMS relay from a paired
+  /// iPhone to be enabled on the host Mac.
+  private func sendDirectMessageAutomatically(_ resolved: MessageSendOptions) throws {
+    var preferred = resolved
+    preferred.service = .imessage
+
+    do {
+      try sendViaAppleScript(preferred, chatTarget: "", useChat: false)
+      return
+    } catch let error as IMsgError {
+      guard shouldFallbackAutoSendToSMS(error: error, recipient: resolved.recipient) else {
+        throw error
+      }
+
+      guard resolved.attachmentPath.isEmpty else {
+        throw error
+      }
+    }
+
+    var fallback = resolved
+    fallback.service = .sms
+    try sendViaAppleScript(fallback, chatTarget: "", useChat: false)
   }
 
   private func stageAttachment(at path: String) throws -> String {
@@ -174,14 +205,14 @@ public struct MessageSender {
   private func resolveChatTarget(_ options: inout MessageSendOptions) -> String {
     let guid = options.chatGUID.trimmingCharacters(in: .whitespacesAndNewlines)
     let identifier = options.chatIdentifier.trimmingCharacters(in: .whitespacesAndNewlines)
+    if !guid.isEmpty {
+      return guid
+    }
     if !identifier.isEmpty && looksLikeHandle(identifier) {
       if options.recipient.isEmpty {
         options.recipient = identifier
       }
       return ""
-    }
-    if !guid.isEmpty {
-      return guid
     }
     if identifier.isEmpty {
       return ""
@@ -199,6 +230,39 @@ public struct MessageSender {
     if trimmed.contains("@") { return true }
     let allowed = CharacterSet(charactersIn: "+0123456789 ()-")
     return trimmed.rangeOfCharacter(from: allowed.inverted) == nil
+  }
+
+  private func looksLikePhoneRecipient(_ value: String) -> Bool {
+    let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return false }
+    guard trimmed.contains("@") == false else { return false }
+
+    let allowed = CharacterSet(charactersIn: "+0123456789 ()-")
+    guard trimmed.rangeOfCharacter(from: allowed.inverted) == nil else {
+      return false
+    }
+
+    return trimmed.contains(where: \.isNumber)
+  }
+
+  private func shouldFallbackAutoSendToSMS(error: IMsgError, recipient: String) -> Bool {
+    guard looksLikePhoneRecipient(recipient) else {
+      return false
+    }
+
+    guard case .appleScriptFailure(let message) = error else {
+      return false
+    }
+
+    let lower = message.lowercased()
+    if lower.contains("not authorized") || lower.contains("not authorised") {
+      return false
+    }
+    if lower.contains("attachment not found") {
+      return false
+    }
+
+    return true
   }
 
   private static func runAppleScript(source: String, arguments: [String]) throws {

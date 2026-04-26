@@ -5,8 +5,8 @@ set -euo pipefail
 # itui installer
 #
 # Sets up both pieces:
-#   1. imsg  — the iMessage API server (Swift, macOS only)
-#   2. itui  — the terminal UI client  (Bun + OpenTUI, any platform)
+#   1. imsg  — the macOS server that serves the web UI and API
+#   2. itui  — the optional terminal UI client (Bun + OpenTUI)
 #
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/R44VC0RP/itui/main/install.sh | bash
@@ -34,32 +34,20 @@ warn()  { echo -e "${BOLD}${YELLOW}▸${RESET} $1"; }
 error() { echo -e "${BOLD}${RED}▸${RESET} $1"; }
 dim()   { echo -e "${DIM}  $1${RESET}"; }
 
-# Discover IPv4 addresses on non-loopback, non-virtual interfaces.
-# Prints one "ip iface" pair per line. Empty output if ifconfig isn't available
-# or no interfaces have a routable address. macOS-focused interface filtering:
-# we drop AWDL/AirDrop (awdl*, llw*), VPN tunnels (utun*), bridges, iPhone
-# hotspot helpers (anpi*, ap*), and virtualization NICs (vmenet*, vnic*) —
-# those either never carry useful addresses or would be misleading in output.
-list_lan_ipv4() {
-  command -v ifconfig &>/dev/null || return 0
-  ifconfig -a 2>/dev/null | awk '
-    /^[a-zA-Z0-9]+:.*flags=/ {
-      iface = $1
-      sub(":$", "", iface)
-      skip = (iface ~ /^(lo|utun|awdl|llw|anpi|ap[0-9]|bridge|gif|stf|vmenet|vnic)/)
-    }
-    /^[[:space:]]+inet [0-9]/ {
-      if (skip) next
-      ip = $2
-      # Skip loopback and IPv4 link-local (169.254/16, assigned when DHCP fails).
-      if (ip !~ /^127\./ && ip !~ /^169\.254\./) {
-        print ip, iface
-      }
-    }
-  '
+prepend_path() {
+  local dir="$1"
+  if [[ -d "$dir" ]]; then
+    PATH="$dir:$PATH"
+  fi
 }
 
-REPO_URL="https://github.com/R44VC0RP/itui.git"
+prepend_path "$HOME/.bun/bin"
+prepend_path "/opt/homebrew/bin"
+prepend_path "/usr/local/bin"
+prepend_path "/Applications/Tailscale.app/Contents/MacOS"
+
+REPO_URL="${ITUI_REPO_URL:-https://github.com/R44VC0RP/itui.git}"
+
 INSTALL_DIR="${ITUI_INSTALL_DIR:-$HOME/.itui}"
 
 # Non-generic default port chosen to avoid collisions with common dev servers
@@ -71,14 +59,15 @@ DAEMON_LABEL="com.r44vc0rp.itui.imsg"
 DAEMON_PLIST="$HOME/Library/LaunchAgents/$DAEMON_LABEL.plist"
 DAEMON_LOG_DIR="$HOME/.itui/logs"
 
-# Tracks whether we actually installed the daemon; controls the final message.
-DAEMON_INSTALLED=0
+# Tracks daemon state for installer output.
+DAEMON_CONFIGURED=0
+DAEMON_HEALTHY=0
 
 # ── Preflight ─────────────────────────────────────────────────────────────────
 
 echo ""
 echo -e "${BOLD}  itui installer${RESET}"
-echo -e "  iMessage in your terminal"
+echo -e "  iMessage in your terminal and browser"
 echo ""
 
 # Check for macOS (server requires it; client works anywhere but the install
@@ -101,13 +90,40 @@ check_dep() {
 }
 
 MISSING=0
+HAS_BUN=0
+HAS_NODE=0
+HAS_TAILSCALE=0
+
+if command -v bun &>/dev/null; then
+  HAS_BUN=1
+fi
+
+if command -v node &>/dev/null && command -v npm &>/dev/null; then
+  HAS_NODE=1
+fi
+
+if command -v tailscale &>/dev/null; then
+  HAS_TAILSCALE=1
+fi
 
 if [[ "$(uname -s)" == "Darwin" ]]; then
   check_dep swift "Install Xcode or Xcode Command Line Tools: xcode-select --install" || MISSING=1
 fi
 
-check_dep bun "Install Bun: curl -fsSL https://bun.sh/install | bash" || MISSING=1
 check_dep git "Install git via Xcode CLT or Homebrew" || MISSING=1
+
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  if [[ "$HAS_BUN" -eq 0 ]]; then
+    warn "bun not found. Skipping the optional TUI client install."
+    dim "Install Bun later if you also want the terminal UI: curl -fsSL https://bun.sh/install | bash"
+  fi
+else
+  if [[ "$HAS_BUN" -eq 0 ]]; then
+    error "bun is required to install the itui client on non-macOS systems."
+    dim "Install Bun: curl -fsSL https://bun.sh/install | bash"
+    MISSING=1
+  fi
+fi
 
 if [[ "$MISSING" -eq 1 ]]; then
   echo ""
@@ -115,21 +131,60 @@ if [[ "$MISSING" -eq 1 ]]; then
   exit 1
 fi
 
-info "Dependencies OK — swift $(swift --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' || echo 'n/a'), bun $(bun --version)"
+SUMMARY=()
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  SWIFT_VERSION="$(swift --version 2>/dev/null | awk '/Swift version/{print $4; exit}')"
+  SUMMARY+=("swift ${SWIFT_VERSION:-n/a}")
+fi
+SUMMARY+=("git $(git --version | awk '{print $3}')")
+if [[ "$HAS_BUN" -eq 1 ]]; then
+  SUMMARY+=("bun $(bun --version)")
+fi
+if [[ "$HAS_NODE" -eq 1 ]]; then
+  SUMMARY+=("node $(node --version)")
+fi
+info "Dependencies OK — ${SUMMARY[*]}"
 
 # ── Clone / update ────────────────────────────────────────────────────────────
 
 if [[ -d "$INSTALL_DIR/.git" ]]; then
   info "Updating existing install at $INSTALL_DIR"
-  git -C "$INSTALL_DIR" pull --ff-only || {
-    warn "Pull failed — continuing with existing checkout"
-  }
+  if git -C "$INSTALL_DIR" remote get-url origin >/dev/null 2>&1; then
+    git -C "$INSTALL_DIR" pull --ff-only || {
+      warn "Pull failed — continuing with existing checkout"
+    }
+  else
+    warn "No git remote configured — continuing with existing checkout"
+  fi
 else
   info "Cloning to $INSTALL_DIR"
   git clone "$REPO_URL" "$INSTALL_DIR"
 fi
 
 cd "$INSTALL_DIR"
+
+# ── Refresh bundled browser assets if possible ───────────────────────────────
+
+if [[ "$(uname -s)" == "Darwin" && -f "$INSTALL_DIR/scripts/build-web.sh" ]]; then
+  echo ""
+
+  if [[ "$HAS_NODE" -eq 1 ]]; then
+    info "Refreshing bundled browser assets…"
+    if ! "$INSTALL_DIR/scripts/build-web.sh"; then
+      if [[ -f "$INSTALL_DIR/Sources/imsg/Resources/web/index.html" ]]; then
+        warn "Web build failed — continuing with checked-in bundled assets"
+      else
+        error "Bundled browser assets are missing and the local web build failed."
+        exit 1
+      fi
+    fi
+  elif [[ -f "$INSTALL_DIR/Sources/imsg/Resources/web/index.html" ]]; then
+    warn "Node.js/npm not found. Using checked-in bundled browser assets."
+  else
+    error "Bundled browser assets are missing and Node.js/npm are not available to rebuild them."
+    exit 1
+  fi
+fi
 
 # ── Build the imsg server (macOS only) ────────────────────────────────────────
 
@@ -161,11 +216,14 @@ fi
 
 # ── Install the itui client ──────────────────────────────────────────────────
 
-echo ""
-info "Installing itui client…"
-cd "$INSTALL_DIR/itui"
-bun install --frozen-lockfile 2>/dev/null || bun install
-info "Client dependencies installed"
+if [[ "$HAS_BUN" -eq 1 ]]; then
+  echo ""
+  info "Installing itui client…"
+  cd "$INSTALL_DIR/itui"
+  bun install --frozen-lockfile 2>/dev/null || bun install
+  info "Client dependencies installed"
+  cd "$INSTALL_DIR"
+fi
 
 # ── Symlinks ──────────────────────────────────────────────────────────────────
 
@@ -174,14 +232,18 @@ info "Creating symlinks…"
 
 BIN_DIR="$HOME/.local/bin"
 mkdir -p "$BIN_DIR"
+IMSG_CMD="imsg"
 
-# itui launcher script
-cat > "$BIN_DIR/itui" << 'LAUNCHER'
+if [[ "$HAS_BUN" -eq 1 ]]; then
+  BUN_BIN="$(command -v bun)"
+  # itui launcher script
+  cat > "$BIN_DIR/itui" << LAUNCHER
 #!/usr/bin/env bash
-exec bun run "$HOME/.itui/itui/src/cli.tsx" "$@"
+exec "$BUN_BIN" run "$INSTALL_DIR/itui/src/cli.tsx" "\$@"
 LAUNCHER
-chmod +x "$BIN_DIR/itui"
-info "  itui  → $BIN_DIR/itui"
+  chmod +x "$BIN_DIR/itui"
+  info "  itui  → $BIN_DIR/itui"
+fi
 
 # imsg server (macOS only)
 if [[ "$(uname -s)" == "Darwin" ]] && [[ -n "$IMSG_BIN" ]]; then
@@ -192,6 +254,7 @@ fi
 # ── PATH check ────────────────────────────────────────────────────────────────
 
 if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
+  IMSG_CMD="$BIN_DIR/imsg"
   echo ""
   warn "$BIN_DIR is not in your PATH."
   dim "Add this to your shell profile (~/.zshrc, ~/.bashrc, etc.):"
@@ -202,10 +265,11 @@ fi
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
-CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/itui"
-if [[ ! -f "$CONFIG_DIR/config.json" ]]; then
-  mkdir -p "$CONFIG_DIR"
-  cat > "$CONFIG_DIR/config.json" << CONFIG
+if [[ "$HAS_BUN" -eq 1 ]]; then
+  CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/itui"
+  if [[ ! -f "$CONFIG_DIR/config.json" ]]; then
+    mkdir -p "$CONFIG_DIR"
+    cat > "$CONFIG_DIR/config.json" << CONFIG
 {
   "server": "http://127.0.0.1:${DEFAULT_PORT}",
   "token": null,
@@ -216,10 +280,11 @@ if [[ ! -f "$CONFIG_DIR/config.json" ]]; then
   "notificationSound": true
 }
 CONFIG
-  info "Created config at $CONFIG_DIR/config.json"
-else
-  info "Config already exists at $CONFIG_DIR/config.json"
-  dim "(not overwriting — check that 'server' points to port $DEFAULT_PORT if you want the daemon default)"
+    info "Created config at $CONFIG_DIR/config.json"
+  else
+    info "Config already exists at $CONFIG_DIR/config.json"
+    dim "(not overwriting — check that 'server' points to port $DEFAULT_PORT if you want the daemon default)"
+  fi
 fi
 
 # ── macOS LaunchAgent (optional daemon) ──────────────────────────────────────
@@ -232,67 +297,35 @@ install_daemon() {
   local bin="$1"
   local port="$2"
 
-  mkdir -p "$(dirname "$DAEMON_PLIST")"
-  mkdir -p "$DAEMON_LOG_DIR"
+  DAEMON_CONFIGURED=1
 
-  # If an older version of the plist is already loaded, unload it so we can
-  # update ProgramArguments (port, binary path, etc.) cleanly.
-  if launchctl print "gui/$UID/$DAEMON_LABEL" &>/dev/null; then
-    launchctl bootout "gui/$UID/$DAEMON_LABEL" 2>/dev/null || true
+  daemon_healthcheck() {
+    local attempts=0
+    while [[ "$attempts" -lt 10 ]]; do
+      if curl -fsS "http://127.0.0.1:${port}/api/chats?limit=1" >/dev/null 2>&1; then
+        return 0
+      fi
+      sleep 1
+      attempts=$((attempts + 1))
+    done
+    return 1
+  }
+
+  if "$bin" service install --host 127.0.0.1 --port "$port" --binary "$bin"; then
+    if daemon_healthcheck; then
+      info "  Background service is healthy on 127.0.0.1:${port}"
+      DAEMON_HEALTHY=1
+      return 0
+    fi
   fi
 
-  cat > "$DAEMON_PLIST" << PLIST
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>${DAEMON_LABEL}</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>${bin}</string>
-        <string>serve</string>
-        <string>--host</string>
-        <string>127.0.0.1</string>
-        <string>--port</string>
-        <string>${port}</string>
-    </array>
-    <key>RunAtLoad</key>
-    <true/>
-    <key>KeepAlive</key>
-    <dict>
-        <key>SuccessfulExit</key>
-        <false/>
-        <key>Crashed</key>
-        <true/>
-    </dict>
-    <key>ThrottleInterval</key>
-    <integer>5</integer>
-    <key>ProcessType</key>
-    <string>Interactive</string>
-    <key>StandardOutPath</key>
-    <string>${DAEMON_LOG_DIR}/imsg.log</string>
-    <key>StandardErrorPath</key>
-    <string>${DAEMON_LOG_DIR}/imsg.err.log</string>
-    <key>EnvironmentVariables</key>
-    <dict>
-        <key>HOME</key>
-        <string>${HOME}</string>
-    </dict>
-</dict>
-</plist>
-PLIST
-
-  chmod 644 "$DAEMON_PLIST"
-
-  if launchctl bootstrap "gui/$UID" "$DAEMON_PLIST" 2>/dev/null; then
-    launchctl kickstart -k "gui/$UID/$DAEMON_LABEL" &>/dev/null || true
-    info "  Loaded LaunchAgent — running on 127.0.0.1:${port}"
-    DAEMON_INSTALLED=1
-  else
-    warn "Wrote plist but launchctl bootstrap failed."
-    dim "Load manually: launchctl bootstrap gui/\$UID $DAEMON_PLIST"
-  fi
+  warn "Background service is installed, but the web server is not healthy yet."
+  dim "Grant Full Disk Access to:"
+  dim "  $bin"
+  dim "Then run:"
+  dim "  $IMSG_CMD service restart"
+  dim "Check status with:"
+  dim "  $IMSG_CMD service status"
 }
 
 prompt_daemon_install() {
@@ -302,6 +335,11 @@ prompt_daemon_install() {
     1|yes|true|YES|TRUE)  return 0 ;;
     0|no|false|NO|FALSE)  return 1 ;;
   esac
+
+  if [[ -f "$DAEMON_PLIST" ]]; then
+    info "Refreshing existing LaunchAgent…"
+    return 0
+  fi
 
   # No TTY on stdin (piped install). We deliberately don't read from /dev/tty
   # here — installing a persistent background daemon should be opt-in via env
@@ -341,7 +379,7 @@ if [[ "$(uname -s)" == "Darwin" ]]; then
   echo "  The imsg server reads your Messages database and sends messages"
   echo "  via AppleScript. You'll need to grant:"
   echo ""
-  if [[ "$DAEMON_INSTALLED" -eq 1 ]]; then
+  if [[ "$DAEMON_CONFIGURED" -eq 1 ]]; then
     # When run under launchd, TCC applies to the imsg binary itself, not the
     # parent terminal. Grant has to target the binary path explicitly.
     echo "    1. Full Disk Access     → System Settings → Privacy → Full Disk Access"
@@ -352,58 +390,31 @@ if [[ "$(uname -s)" == "Darwin" ]]; then
     echo "       (for your terminal app — iTerm2, Terminal.app, etc.)"
   fi
   echo ""
-  echo "    2. Contacts Access      → granted on first run (a prompt will appear)"
+  echo "    2. Contacts Access      → grant by running locally once:"
+  echo "       $IMSG_BIN contacts --json"
   echo ""
   echo "    3. Automation (Messages) → granted on first send (a prompt will appear)"
   echo ""
+  echo "  Open the privacy panes with:"
+  echo "       $IMSG_CMD service permissions"
+  echo ""
+  echo "  If you plan to launch imsg over SSH or another background context,"
+  echo "  run it once locally first so macOS can show the Contacts and"
+  echo "  Automation permission prompts."
+  echo ""
 fi
 
-# ── Network addresses ────────────────────────────────────────────────────────
+# ── Network access ───────────────────────────────────────────────────────────
 
-# Show how this machine is reachable. The daemon (and default `imsg serve`) bind
-# to 127.0.0.1, so LAN URLs require either an SSH tunnel or rebinding to
-# 0.0.0.0. We show them regardless because:
-#  1. Users often want to tunnel from another machine and need to pick a host.
-#  2. If they run `imsg serve --host 0.0.0.0` manually, these URLs are live.
-#  3. Knowing the LAN address makes the SSH tunnel instructions concrete.
 if [[ "$(uname -s)" == "Darwin" ]]; then
   echo ""
-  echo -e "${BOLD}  Network addresses:${RESET}"
+  echo -e "${BOLD}  Network access:${RESET}"
   echo ""
-  echo "    Local:     http://127.0.0.1:${DEFAULT_PORT}"
-
-  LAN_ENTRIES=$(list_lan_ipv4)
-  if [[ -n "$LAN_ENTRIES" ]]; then
-    first_lan=1
-    while IFS= read -r entry; do
-      [[ -z "$entry" ]] && continue
-      ip=$(echo "$entry" | awk '{print $1}')
-      iface=$(echo "$entry" | awk '{print $2}')
-      if [[ "$first_lan" -eq 1 ]]; then
-        printf "    LAN:       %-22s ${DIM}(%s)${RESET}\n" "http://${ip}:${DEFAULT_PORT}" "$iface"
-        first_lan=0
-      else
-        printf "               %-22s ${DIM}(%s)${RESET}\n" "http://${ip}:${DEFAULT_PORT}" "$iface"
-      fi
-    done <<< "$LAN_ENTRIES"
-
-    echo ""
-    if [[ "$DAEMON_INSTALLED" -eq 1 ]]; then
-      dim "The daemon binds to 127.0.0.1 only (no auth on the server yet)."
-      dim "To reach a LAN URL from another machine, either:"
-      dim "  • SSH tunnel (recommended):"
-      dim "      ssh -N -L ${DEFAULT_PORT}:127.0.0.1:${DEFAULT_PORT} you@this-mac"
-      dim "  • Or rebind the daemon to 0.0.0.0 (only on a trusted network):"
-      dim "      edit $DAEMON_PLIST (change --host 127.0.0.1 → 0.0.0.0) and reload:"
-      dim "      launchctl bootout gui/\$UID $DAEMON_PLIST && launchctl bootstrap gui/\$UID $DAEMON_PLIST"
-    else
-      dim "By default 'imsg serve' binds to 127.0.0.1 only. To expose on LAN:"
-      dim "  imsg serve --host 0.0.0.0 --port ${DEFAULT_PORT}"
-      dim "(No auth on the server yet — only do this on trusted networks.)"
-    fi
-  else
-    dim "No LAN interfaces detected."
-  fi
+  echo "    Local: http://127.0.0.1:${DEFAULT_PORT}"
+  echo ""
+  dim "From another device, use Tailscale Serve or an SSH tunnel:"
+  dim "  tailscale serve --bg ${DEFAULT_PORT}"
+  dim "  ssh -N -L ${DEFAULT_PORT}:127.0.0.1:${DEFAULT_PORT} you@this-mac"
 fi
 
 # ── Done ──────────────────────────────────────────────────────────────────────
@@ -411,24 +422,77 @@ fi
 echo ""
 echo -e "${BOLD}${GREEN}  ✓ Installation complete${RESET}"
 echo ""
-echo "  Quick start:"
+echo "  What happened:"
 echo ""
 if [[ "$(uname -s)" == "Darwin" ]]; then
-  if [[ "$DAEMON_INSTALLED" -eq 1 ]]; then
-    echo "    1. Server is running in the background (LaunchAgent)"
-    echo "    2. Open the TUI:       itui"
+  echo "    • Installed or updated itui in $INSTALL_DIR"
+  if [[ -n "$IMSG_BIN" ]]; then
+    echo "    • Built imsg at $IMSG_BIN"
+  fi
+  if [[ "$DAEMON_CONFIGURED" -eq 1 ]]; then
+    echo "    • Installed the user LaunchAgent for 127.0.0.1:${DEFAULT_PORT}"
+  else
+    echo "    • Did not install the background LaunchAgent"
+  fi
+  echo ""
+  echo "  Next steps:"
+  echo ""
+  if [[ "$DAEMON_HEALTHY" -eq 1 ]]; then
+    echo "    • Check the service:  $IMSG_CMD service status"
+  elif [[ "$DAEMON_CONFIGURED" -eq 1 ]]; then
+    echo "    • Open permissions:   $IMSG_CMD service permissions"
+    echo "    • Grant Full Disk Access to:"
+    echo "       $IMSG_BIN"
+    echo "    • Restart service:    $IMSG_CMD service restart"
+    echo "    • Check status:       $IMSG_CMD service status"
+  else
+    echo "    • Grant Full Disk Access to your terminal app"
+    echo "    • Start the web app:  $IMSG_CMD serve --host 127.0.0.1 --port ${DEFAULT_PORT}"
+  fi
+  echo "    • Open in browser:    http://127.0.0.1:${DEFAULT_PORT}"
+  echo ""
+  echo "  If Contacts names or avatars are missing, run this once from the Mac desktop:"
+  echo "    $IMSG_BIN contacts --json"
+  if [[ "$HAS_BUN" -eq 1 ]]; then
+    echo ""
+    echo "  Optional TUI:"
+    echo "    itui"
+  fi
+  if [[ "$DAEMON_CONFIGURED" -eq 1 ]]; then
     echo ""
     echo "  Daemon controls:"
-    echo "    Logs:      tail -f $DAEMON_LOG_DIR/imsg.log"
-    echo "    Restart:   launchctl kickstart -k gui/\$UID/$DAEMON_LABEL"
-    echo "    Stop:      launchctl bootout gui/\$UID/$DAEMON_LABEL"
-    echo "    Uninstall: launchctl bootout gui/\$UID/$DAEMON_LABEL && rm $DAEMON_PLIST"
-  else
-    echo "    1. Start the server:   imsg serve"
-    echo "    2. Open the TUI:       itui"
+    echo "    Status:    $IMSG_CMD service status"
+    echo "    Restart:   $IMSG_CMD service restart"
+    echo "    Stop:      $IMSG_CMD service stop"
+    echo "    Logs:      $IMSG_CMD service logs -f"
   fi
 else
   echo "    1. Point at your Mac:  itui config set server=http://your-mac:${DEFAULT_PORT}"
   echo "    2. Open the TUI:       itui"
 fi
 echo ""
+
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  if [[ "$HAS_TAILSCALE" -eq 1 ]]; then
+    echo "  Optional Tailscale Serve:"
+    echo ""
+    echo "    tailscale serve --bg ${DEFAULT_PORT}"
+    echo "    tailscale serve status"
+    echo ""
+    echo "  Open the HTTPS URL shown by 'tailscale serve status' from another"
+    echo "  device in your tailnet."
+    echo ""
+  fi
+
+  echo "  Remote access (without Tailscale):"
+  echo ""
+  echo "    ssh -N -L ${DEFAULT_PORT}:127.0.0.1:${DEFAULT_PORT} you@your-mac"
+  echo "    # then open http://127.0.0.1:${DEFAULT_PORT} or run itui"
+  echo ""
+else
+  echo "  Remote access (from another machine):"
+  echo ""
+  echo "    ssh -N -L ${DEFAULT_PORT}:127.0.0.1:${DEFAULT_PORT} you@your-mac"
+  echo "    itui"
+  echo ""
+fi
