@@ -285,9 +285,12 @@ export const mergeLoadedMessages = (
   loaded: ImsgMessage[]
 ) => {
   const nextServerMessages = sortConversationMessages([...loaded])
+  const nextServerMessageIds = new Set(
+    nextServerMessages.map((message) => message.id)
+  )
   const remainingLocalMessages = current.filter((message) => {
     if (!message.clientId) {
-      return false
+      return !nextServerMessageIds.has(message.id)
     }
 
     return !nextServerMessages.some((serverMessage) =>

@@ -148,6 +148,15 @@ extension WebServer {
       }
     }
 
+    api.delete("uploads/:id") { _, context -> Response in
+      guard let uploadID = context.parameters.get("id"), UUID(uuidString: uploadID) != nil else {
+        return Self.errorResponse(status: .badRequest, message: "invalid upload id")
+      }
+
+      await localUploadStager.remove(id: uploadID)
+      return Self.jsonResponse(OkResponse(ok: true))
+    }
+
     api.post("send") { request, _ -> Response in
       let body = try await request.body.collect(upTo: 1_048_576)
       let data = Data(buffer: body)

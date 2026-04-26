@@ -124,6 +124,38 @@ describe("conversation message reconciliation", () => {
     )
   })
 
+  it("keeps realtime server messages that are newer than a refresh snapshot", () => {
+    const realtimeMessage = makeMessage({
+      created_at: "2026-04-17T12:05:00.000Z",
+      guid: "realtime-guid",
+      id: 101,
+      text: "Arrived over SSE",
+    })
+
+    const loaded = mergeLoadedMessages(
+      [
+        makeMessage({
+          created_at: "2026-04-17T12:00:00.000Z",
+          guid: "loaded-guid",
+          id: 100,
+          text: "Loaded snapshot",
+        }),
+        realtimeMessage,
+      ],
+      [
+        makeMessage({
+          created_at: "2026-04-17T12:00:00.000Z",
+          guid: "loaded-guid",
+          id: 100,
+          text: "Loaded snapshot",
+        }),
+      ]
+    )
+
+    expect(loaded).toHaveLength(2)
+    expect(loaded.some((message) => message.id === realtimeMessage.id)).toBe(true)
+  })
+
   it("keeps chats sorted by activity while updating previews", () => {
     const next = applyChatActivity(
       [

@@ -37,6 +37,7 @@ public actor ContactResolver {
   /// same index in `records` so that any variant of a handle resolves to the same contact.
   private var index: [String: Int] = [:]
   private var loaded = false
+  private var loadTask: Task<(ContactAuthorizationStatus, [ContactRecord]), Never>?
   private var authorization: ContactAuthorizationStatus = .notDetermined
 
   /// Base directory for exported avatar images. Defaults to `~/Library/Caches/imsg/avatars`.
@@ -72,9 +73,21 @@ public actor ContactResolver {
   /// rest of the app keeps working against un-resolved handles.
   public func loadIfNeeded() async {
     guard !loaded else { return }
-    loaded = true
-    (authorization, records) = await ContactResolver.fetchAllContacts()
-    index = ContactResolver.buildIndex(records: records)
+
+    if let loadTask {
+      let result = await loadTask.value
+      applyLoadedContactsIfNeeded(result)
+      return
+    }
+
+    let task = Task {
+      await ContactResolver.fetchAllContacts()
+    }
+    loadTask = task
+
+    let result = await task.value
+    applyLoadedContactsIfNeeded(result)
+    loadTask = nil
   }
 
   /// Returns the authorization state of the Contacts store the last time it was probed.
@@ -185,6 +198,16 @@ public actor ContactResolver {
   }
 
   // MARK: - Internals
+
+  private func applyLoadedContactsIfNeeded(
+    _ result: (ContactAuthorizationStatus, [ContactRecord])
+  ) {
+    guard !loaded else { return }
+    authorization = result.0
+    records = result.1
+    index = ContactResolver.buildIndex(records: records)
+    loaded = true
+  }
 
   private func record(for handle: String) -> ContactRecord? {
     if let idx = index[handle] { return records[idx] }
@@ -437,4 +460,3 @@ public actor ContactResolver {
     return (mappedStatus, records)
   }
 }
-

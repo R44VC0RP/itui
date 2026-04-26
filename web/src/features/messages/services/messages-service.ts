@@ -49,6 +49,10 @@ export class MessagesService {
     return this.client.uploadAttachment(file)
   }
 
+  cancelStagedUpload(id: string): Promise<void> {
+    return this.client.cancelStagedUpload(id)
+  }
+
   createEventStream(
     handlers: EventStreamHandlers,
     reconnectDelayMs = 3_000

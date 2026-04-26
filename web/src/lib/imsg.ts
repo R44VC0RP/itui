@@ -248,6 +248,16 @@ export class ImsgClient {
 
     return data.upload
   }
+
+  async cancelStagedUpload(id: string): Promise<void> {
+    const url = this.url(`/api/uploads/${encodeURIComponent(id)}`)
+    const response = await fetch(url, {
+      headers: this.headers(),
+      method: "DELETE",
+    })
+
+    await this.assertOk(response, url)
+  }
 }
 
 type EventStreamOptions = {

@@ -90,9 +90,8 @@ enum ServiceCommand {
 
   private static func currentExecutablePath() -> String {
     let rawPath = CommandLine.arguments.first ?? Bundle.main.executablePath ?? "imsg"
-    let url = URL(fileURLWithPath: rawPath)
-    if url.path.contains("/") {
-      return url.resolvingSymlinksInPath().path
+    if rawPath.contains("/") {
+      return URL(fileURLWithPath: rawPath).resolvingSymlinksInPath().path
     }
     return Bundle.main.executableURL?.resolvingSymlinksInPath().path ?? rawPath
   }
@@ -366,14 +365,29 @@ struct ServiceManager {
 
   private func stopManualFallback() {
     guard
-      let pid = try? String(contentsOfFile: manualPidPath, encoding: .utf8)
+      let rawPID = try? String(contentsOfFile: manualPidPath, encoding: .utf8)
         .trimmingCharacters(in: .whitespacesAndNewlines),
-      !pid.isEmpty
+      !rawPID.isEmpty
     else {
       return
     }
-    _ = runProcess("/bin/kill", [pid])
-    try? FileManager.default.removeItem(atPath: manualPidPath)
+
+    defer {
+      try? FileManager.default.removeItem(atPath: manualPidPath)
+    }
+
+    guard Int32(rawPID) != nil else {
+      return
+    }
+
+    let process = runProcess("/bin/ps", ["-p", rawPID, "-o", "comm="])
+    let commandName = (process.status == 0 ? process.stdout : "")
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+    guard (commandName as NSString).lastPathComponent == "imsg" else {
+      return
+    }
+
+    _ = runProcess("/bin/kill", [rawPID])
   }
 
   private static func parseLaunchState(_ output: String) -> String? {

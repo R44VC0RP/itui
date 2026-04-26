@@ -10,6 +10,7 @@ import { useComposerAttachments } from "@/features/messages/hooks/use-composer-a
 import { useDraftConversationMessages } from "@/features/messages/hooks/use-draft-conversation-messages"
 import { MessagesService } from "@/features/messages/services/messages-service"
 import { describeError } from "@/features/messages/utils"
+import type { StagedUpload } from "@/lib/imsg"
 
 type SendBatch = {
   attachments: ComposerAttachment[]
@@ -169,6 +170,8 @@ export function useMessageComposer({
                 to: conversation.handle,
               }
 
+        let stagedUpload: StagedUpload | null = null
+
         try {
           if (batch.attachments.length === 0) {
             await service.send({
@@ -180,7 +183,7 @@ export function useMessageComposer({
 
           const attachment = batch.attachments[0]!
 
-          const stagedUpload = await service.uploadAttachment(attachment.file)
+          stagedUpload = await service.uploadAttachment(attachment.file)
 
           await service.send({
             ...baseTarget,
@@ -188,6 +191,14 @@ export function useMessageComposer({
             uploadId: stagedUpload.id,
           })
         } catch (error) {
+          if (stagedUpload?.id) {
+            try {
+              await service.cancelStagedUpload(stagedUpload.id)
+            } catch {
+              // Best-effort cleanup should not hide the original send failure.
+            }
+          }
+
           const errorMessage = describeError(error)
           queuedBatches
             .slice(index)
