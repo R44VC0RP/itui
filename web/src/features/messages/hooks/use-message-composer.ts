@@ -229,6 +229,7 @@ export function useMessageComposer({
     const queuedBatches = batches.map((batch) => {
       const optimisticMessage = createOptimisticConversationMessage({
         attachments: batch.attachments,
+        chatId: activeConversation.kind === "thread" ? activeConversation.id : undefined,
         handle: conversationHandle(activeConversation),
         text: batch.text,
       })

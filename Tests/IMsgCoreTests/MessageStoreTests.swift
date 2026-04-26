@@ -127,6 +127,96 @@ func listChatsPrefixesOutgoingAttachmentPreview() throws {
 }
 
 @Test
+func listChatsSummarizesReactionRowsBeforeText() throws {
+  let db = try Connection(.inMemory)
+  try db.execute(
+    """
+    CREATE TABLE message (
+      ROWID INTEGER PRIMARY KEY,
+      handle_id INTEGER,
+      text TEXT,
+      guid TEXT,
+      associated_message_guid TEXT,
+      associated_message_type INTEGER,
+      date INTEGER,
+      is_from_me INTEGER,
+      service TEXT
+    );
+    """
+  )
+  try db.execute(
+    """
+    CREATE TABLE chat (
+      ROWID INTEGER PRIMARY KEY,
+      chat_identifier TEXT,
+      guid TEXT,
+      display_name TEXT,
+      service_name TEXT
+    );
+    """
+  )
+  try db.execute("CREATE TABLE handle (ROWID INTEGER PRIMARY KEY, id TEXT);")
+  try db.execute("CREATE TABLE chat_message_join (chat_id INTEGER, message_id INTEGER);")
+  try db.execute(
+    """
+    CREATE TABLE attachment (
+      ROWID INTEGER PRIMARY KEY,
+      filename TEXT,
+      transfer_name TEXT,
+      uti TEXT,
+      mime_type TEXT,
+      total_bytes INTEGER,
+      is_sticker INTEGER
+    );
+    """
+  )
+  try db.execute(
+    """
+    CREATE TABLE message_attachment_join (
+      message_id INTEGER,
+      attachment_id INTEGER
+    );
+    """
+  )
+
+  let now = Date()
+  try db.run(
+    """
+    INSERT INTO chat(ROWID, chat_identifier, guid, display_name, service_name)
+    VALUES (1, '+15555550123', 'iMessage;+;chat1', '', 'iMessage')
+    """
+  )
+  try db.run("INSERT INTO handle(ROWID, id) VALUES (1, '+15555550123')")
+  try db.run(
+    """
+    INSERT INTO message(
+      ROWID, handle_id, text, guid, associated_message_guid, associated_message_type,
+      date, is_from_me, service
+    )
+    VALUES (1, 1, 'Original message', 'message-guid-1', NULL, 0, ?, 0, 'iMessage')
+    """,
+    TestDatabase.appleEpoch(now.addingTimeInterval(-60))
+  )
+  try db.run(
+    """
+    INSERT INTO message(
+      ROWID, handle_id, text, guid, associated_message_guid, associated_message_type,
+      date, is_from_me, service
+    )
+    VALUES (2, 1, 'Loved "Original message"', 'reaction-guid-1', 'p:message-guid-1', 2000, ?, 0, 'iMessage')
+    """,
+    TestDatabase.appleEpoch(now)
+  )
+  try db.run("INSERT INTO chat_message_join(chat_id, message_id) VALUES (1, 1)")
+  try db.run("INSERT INTO chat_message_join(chat_id, message_id) VALUES (1, 2)")
+
+  let store = try MessageStore(connection: db, path: ":memory:")
+  let chats = try store.listChats(limit: 1)
+
+  #expect(chats.first?.preview == "Reacted with ❤️")
+}
+
+@Test
 func chatInfoReturnsMetadata() throws {
   let store = try TestDatabase.makeStore()
   let info = try store.chatInfo(chatID: 1)

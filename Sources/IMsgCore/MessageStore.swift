@@ -327,10 +327,10 @@ public final class MessageStore: @unchecked Sendable {
     let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
 
     let summary: String
-    if !trimmedText.isEmpty {
+    if let associatedType, ReactionType.isReaction(associatedType) {
+      summary = reactionPreviewSummary(text: text, associatedType: associatedType)
+    } else if !trimmedText.isEmpty {
       summary = trimmedText
-    } else if let associatedType, ReactionType.isReaction(associatedType) {
-      summary = reactionPreviewSummary(text: trimmedText, associatedType: associatedType)
     } else if attachmentCount > 0 {
       summary = attachmentPreviewSummary(
         count: attachmentCount,

@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: help format lint test build imsg clean web-build web-dev
+.PHONY: help format lint test build imsg clean web-build web-dev web-serve
 
 help:
 	@printf "%s\n" \
@@ -11,6 +11,7 @@ help:
 		"make imsg    - clean rebuild + run debug binary (ARGS=...)" \
 		"make web-build - build web/ and copy it into Sources/imsg/Resources/web/" \
 		"make web-dev   - run the Vite dev server for web/" \
+		"make web-serve - build web + debug imsg, then serve the bundled app" \
 		"make clean   - swift package clean"
 
 format:
@@ -45,6 +46,11 @@ web-build:
 
 web-dev:
 	scripts/dev-web.sh
+
+web-serve:
+	scripts/build-web.sh
+	swift build -c debug --product imsg
+	./.build/debug/imsg serve --host 127.0.0.1 --port 13197
 
 clean:
 	swift package clean

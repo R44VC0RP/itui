@@ -53,8 +53,19 @@ itui --server=http://imsg-host.local:13197
 
 ## Remote usage
 
-The iMessage server (`imsg serve`) runs on your Mac. To reach it from another machine,
-either expose it on a trusted network or tunnel in over SSH:
+The iMessage server (`imsg serve`) runs on your Mac. For a normal installed
+server, check it with:
+
+```sh
+imsg service status
+```
+
+To reach it from another machine, use Tailscale Serve or tunnel in over SSH:
+
+```sh
+tailscale serve --bg 13197
+tailscale serve status
+```
 
 ```sh
 # From your laptop, tunnel :13197 on the Mac to localhost:13197
@@ -65,7 +76,7 @@ itui
 ```
 
 > The imsg server does not currently require auth. `token` is plumbed through for when it
-> does. Until then, don't expose the server directly on the public internet — tunnel it.
+> does. Until then, don't expose the server directly on the public internet.
 
 ## Keys
 

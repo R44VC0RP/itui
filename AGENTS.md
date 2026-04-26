@@ -10,26 +10,28 @@
 - `make build` — universal release build into `bin/`.
 - `make lint` — run `swift format` lint + `swiftlint`.
 - `make test` — run `swift test` after syncing version + patching deps.
+- `make web-serve` — build the browser bundle, build debug `imsg`, and serve it on `127.0.0.1:13197`.
 
 ## Runbook
 - Local browser runtime:
-  - `make web-build`
-  - `swift build -c debug --product imsg`
-  - `./.build/debug/imsg serve --host 127.0.0.1 --port 13197`
+  - `make web-serve`
   - open `http://127.0.0.1:13197`
-  - `imsg serve` uses the last copied bundle under `Sources/imsg/Resources/web/`, so rebuild with `make web-build` after `web/` changes
+  - use this when testing the bundled web app through Swift; it prevents stale browser assets
 - Installed browser runtime:
-  - `imsg serve --host 127.0.0.1 --port 13197`
+  - recommended install/update: `curl -fsSL https://raw.githubusercontent.com/R44VC0RP/itui/main/install.sh | ITUI_INSTALL_DAEMON=1 bash`
+  - status: `imsg service status`
+  - restart: `imsg service restart`
+  - logs: `imsg service logs -f`
   - open `http://127.0.0.1:13197`
-  - if launching over SSH or another background context, run `~/.itui/bin/imsg contacts --json` once locally so macOS can surface the Contacts prompt
   - for LaunchAgent / daemon mode, Full Disk Access must be granted to `~/.itui/bin/imsg`, not just the terminal app
+  - if names and avatars are missing, run `~/.itui/bin/imsg contacts --json` once from the Mac's normal desktop session
 - Frontend dev loop:
   - keep an `imsg serve` instance running locally or on a reachable macOS host
   - copy `web/.env.example` to `web/.env.local`
   - set `VITE_IMSG_PROXY_TARGET=http://127.0.0.1:13197` for local dev, or point it at the remote/tunneled backend
   - run `make web-dev`
 - Remote host workflow:
-  - run `imsg serve --host 127.0.0.1 --port 13197` on the remote Mac
+  - prefer the installed service on the remote Mac: `imsg service status`
   - either use `VITE_IMSG_PROXY_TARGET=http://your-hostname:13197` if the host resolves on your network
   - or tunnel with `ssh -L 13197:127.0.0.1:13197 user@your-hostname` and use `VITE_IMSG_PROXY_TARGET=http://127.0.0.1:13197`
 - Verification loop:

@@ -169,10 +169,12 @@ export const sortConversationMessages = (messages: ConversationMessage[]) =>
 
 export const createOptimisticConversationMessage = ({
   attachments = [],
+  chatId,
   handle,
   text,
 }: {
   attachments?: ComposerAttachment[]
+  chatId?: number
   handle: string
   text: string
 }): ConversationMessage => {
@@ -181,7 +183,9 @@ export const createOptimisticConversationMessage = ({
 
   return {
     attachments: localAttachments.map(messageAttachmentFromComposerAttachment),
-    chat_id: -1,
+    // Draft conversations do not have a server chat id yet. Existing-thread callers
+    // should pass chatId so optimistic messages can reconcile without extra mutation.
+    chat_id: chatId ?? -1,
     clientId,
     created_at: new Date().toISOString(),
     deliveryError: undefined,

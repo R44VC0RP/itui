@@ -34,7 +34,17 @@ npm install
 
 ## Develop
 
-Run the Swift backend separately:
+For the bundled browser app served by Swift, use:
+
+```bash
+make web-serve
+```
+
+That builds `web/`, copies the generated bundle into
+`../Sources/imsg/Resources/web/`, builds debug `imsg`, and serves
+`http://127.0.0.1:13197`.
+
+For live frontend development, run the Swift backend separately:
 
 ```bash
 swift build -c debug --product imsg

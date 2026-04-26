@@ -71,6 +71,16 @@ describe("conversation message reconciliation", () => {
     expect(next[0]?.clientId).toBeUndefined()
   })
 
+  it("uses the provided chat id for optimistic existing-thread messages", () => {
+    const optimistic = createOptimisticConversationMessage({
+      chatId: 42,
+      handle: "+15555550123",
+      text: "Already in this thread",
+    })
+
+    expect(optimistic.chat_id).toBe(42)
+  })
+
   it("keeps failed local messages but drops matched sending locals during refresh", () => {
     const sending = {
       ...createOptimisticConversationMessage({

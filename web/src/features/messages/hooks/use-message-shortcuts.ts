@@ -36,6 +36,8 @@ export function useMessageShortcuts({
       if (
         blocked ||
         event.defaultPrevented ||
+        event.isComposing ||
+        event.keyCode === 229 ||
         event.metaKey ||
         event.ctrlKey ||
         event.altKey ||

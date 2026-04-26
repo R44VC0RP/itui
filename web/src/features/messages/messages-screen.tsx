@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
@@ -57,6 +57,7 @@ export function MessagesScreen() {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [pendingSearchFocus, setPendingSearchFocus] = useState(false)
+  const mobileSidebarSettingsRef = useRef<HTMLButtonElement>(null)
   const controller = useMessagesController()
   const {
     activeConversation,
@@ -348,7 +349,12 @@ export function MessagesScreen() {
               <SheetContent
                 side="left"
                 className="w-[88vw] max-w-[360px] bg-background p-0 sm:bg-muted/55"
-                onOpenAutoFocus={(event) => event.preventDefault()}
+                onOpenAutoFocus={(event) => {
+                  event.preventDefault()
+                  window.requestAnimationFrame(() => {
+                    mobileSidebarSettingsRef.current?.focus()
+                  })
+                }}
               >
                 <SheetHeader className="border-b px-4 pt-4 pb-3">
                   <div className="flex items-center justify-between gap-3 pr-12">
@@ -367,6 +373,7 @@ export function MessagesScreen() {
                         onSetSidebarOpen(false)
                         setIsSettingsOpen(true)
                       }}
+                      ref={mobileSidebarSettingsRef}
                       size="icon-sm"
                       type="button"
                       variant="ghost"

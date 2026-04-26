@@ -48,32 +48,7 @@ prepend_path "/Applications/Tailscale.app/Contents/MacOS"
 
 REPO_URL="${ITUI_REPO_URL:-https://github.com/R44VC0RP/itui.git}"
 
-# Discover IPv4 addresses on non-loopback, non-virtual interfaces.
-# Prints one "ip iface" pair per line. Empty output if ifconfig isn't available
-# or no interfaces have a routable address. macOS-focused interface filtering:
-# we drop AWDL/AirDrop (awdl*, llw*), VPN tunnels (utun*), bridges, iPhone
-# hotspot helpers (anpi*, ap*), and virtualization NICs (vmenet*, vnic*) —
-# those either never carry useful addresses or would be misleading in output.
-list_lan_ipv4() {
-  command -v ifconfig &>/dev/null || return 0
-  ifconfig -a 2>/dev/null | awk '
-    /^[a-zA-Z0-9]+:.*flags=/ {
-      iface = $1
-      sub(":$", "", iface)
-      skip = (iface ~ /^(lo|utun|awdl|llw|anpi|ap[0-9]|bridge|gif|stf|vmenet|vnic)/)
-    }
-    /^[[:space:]]+inet [0-9]/ {
-      if (skip) next
-      ip = $2
-      # Skip loopback and IPv4 link-local (169.254/16, assigned when DHCP fails).
-      if (ip !~ /^127\./ && ip !~ /^169\.254\./) {
-        print ip, iface
-      }
-    }
-  '
-}
 INSTALL_DIR="${ITUI_INSTALL_DIR:-$HOME/.itui}"
-MANUAL_PID_FILE="$INSTALL_DIR/imsg.manual.pid"
 
 # Non-generic default port chosen to avoid collisions with common dev servers
 # (3000, 4000, 5000, 5173, 8000, 8080, 8888, 9000, etc.). Users can override
@@ -257,6 +232,7 @@ info "Creating symlinks…"
 
 BIN_DIR="$HOME/.local/bin"
 mkdir -p "$BIN_DIR"
+IMSG_CMD="imsg"
 
 if [[ "$HAS_BUN" -eq 1 ]]; then
   BUN_BIN="$(command -v bun)"
@@ -278,6 +254,7 @@ fi
 # ── PATH check ────────────────────────────────────────────────────────────────
 
 if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
+  IMSG_CMD="$BIN_DIR/imsg"
   echo ""
   warn "$BIN_DIR is not in your PATH."
   dim "Add this to your shell profile (~/.zshrc, ~/.bashrc, etc.):"
@@ -320,71 +297,6 @@ install_daemon() {
   local bin="$1"
   local port="$2"
 
-  mkdir -p "$(dirname "$DAEMON_PLIST")"
-  mkdir -p "$DAEMON_LOG_DIR"
-
-  if [[ -f "$MANUAL_PID_FILE" ]]; then
-    local manual_pid
-    manual_pid="$(cat "$MANUAL_PID_FILE" 2>/dev/null || true)"
-    if [[ -n "$manual_pid" ]]; then
-      kill "$manual_pid" 2>/dev/null || true
-    fi
-    rm -f "$MANUAL_PID_FILE"
-  fi
-
-  # If an older version of the plist is already loaded, unload it so we can
-  # update ProgramArguments (port, binary path, etc.) cleanly. Booting out via
-  # the plist path is more reliable than the label-only target when re-running
-  # the installer over SSH or after a failed previous bootstrap.
-  if launchctl print "gui/$UID/$DAEMON_LABEL" &>/dev/null; then
-    launchctl bootout "gui/$UID" "$DAEMON_PLIST" 2>/dev/null \
-      || launchctl bootout "gui/$UID/$DAEMON_LABEL" 2>/dev/null \
-      || true
-  fi
-
-  cat > "$DAEMON_PLIST" << PLIST
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>${DAEMON_LABEL}</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>${bin}</string>
-        <string>serve</string>
-        <string>--host</string>
-        <string>127.0.0.1</string>
-        <string>--port</string>
-        <string>${port}</string>
-    </array>
-    <key>RunAtLoad</key>
-    <true/>
-    <key>KeepAlive</key>
-    <dict>
-        <key>SuccessfulExit</key>
-        <false/>
-        <key>Crashed</key>
-        <true/>
-    </dict>
-    <key>ThrottleInterval</key>
-    <integer>5</integer>
-    <key>ProcessType</key>
-    <string>Interactive</string>
-    <key>StandardOutPath</key>
-    <string>${DAEMON_LOG_DIR}/imsg.log</string>
-    <key>StandardErrorPath</key>
-    <string>${DAEMON_LOG_DIR}/imsg.err.log</string>
-    <key>EnvironmentVariables</key>
-    <dict>
-        <key>HOME</key>
-        <string>${HOME}</string>
-    </dict>
-</dict>
-</plist>
-PLIST
-
-  chmod 644 "$DAEMON_PLIST"
   DAEMON_CONFIGURED=1
 
   daemon_healthcheck() {
@@ -399,34 +311,21 @@ PLIST
     return 1
   }
 
-  daemon_started() {
+  if "$bin" service install --host 127.0.0.1 --port "$port" --binary "$bin"; then
     if daemon_healthcheck; then
-      info "  Loaded LaunchAgent — running on 127.0.0.1:${port}"
+      info "  Background service is healthy on 127.0.0.1:${port}"
       DAEMON_HEALTHY=1
       return 0
     fi
-
-    warn "LaunchAgent loaded, but the server did not become healthy."
-    dim "If you want boot persistence, grant Full Disk Access to:"
-    dim "  $bin"
-    dim "Then restart it with:"
-    dim "  launchctl kickstart -k gui/\$UID/$DAEMON_LABEL"
-    return 1
-  }
-
-  if launchctl bootstrap "gui/$UID" "$DAEMON_PLIST" 2>/dev/null; then
-    launchctl kickstart -k "gui/$UID/$DAEMON_LABEL" &>/dev/null || true
-    daemon_started || true
-  else
-    launchctl bootout "gui/$UID" "$DAEMON_PLIST" 2>/dev/null || true
-    if launchctl bootstrap "gui/$UID" "$DAEMON_PLIST" 2>/dev/null; then
-      launchctl kickstart -k "gui/$UID/$DAEMON_LABEL" &>/dev/null || true
-      daemon_started || true
-    else
-      warn "Wrote plist but launchctl bootstrap failed."
-      dim "Load manually: launchctl bootstrap gui/\$UID $DAEMON_PLIST"
-    fi
   fi
+
+  warn "Background service is installed, but the web server is not healthy yet."
+  dim "Grant Full Disk Access to:"
+  dim "  $bin"
+  dim "Then run:"
+  dim "  $IMSG_CMD service restart"
+  dim "Check status with:"
+  dim "  $IMSG_CMD service status"
 }
 
 prompt_daemon_install() {
@@ -496,58 +395,26 @@ if [[ "$(uname -s)" == "Darwin" ]]; then
   echo ""
   echo "    3. Automation (Messages) → granted on first send (a prompt will appear)"
   echo ""
+  echo "  Open the privacy panes with:"
+  echo "       $IMSG_CMD service permissions"
+  echo ""
   echo "  If you plan to launch imsg over SSH or another background context,"
   echo "  run it once locally first so macOS can show the Contacts and"
   echo "  Automation permission prompts."
   echo ""
 fi
 
-# ── Network addresses ────────────────────────────────────────────────────────
+# ── Network access ───────────────────────────────────────────────────────────
 
-# Show how this machine is reachable. The daemon (and default `imsg serve`) bind
-# to 127.0.0.1, so LAN URLs require either an SSH tunnel or rebinding to
-# 0.0.0.0. We show them regardless because:
-#  1. Users often want to tunnel from another machine and need to pick a host.
-#  2. If they run `imsg serve --host 0.0.0.0` manually, these URLs are live.
-#  3. Knowing the LAN address makes the SSH tunnel instructions concrete.
 if [[ "$(uname -s)" == "Darwin" ]]; then
   echo ""
-  echo -e "${BOLD}  Network addresses:${RESET}"
+  echo -e "${BOLD}  Network access:${RESET}"
   echo ""
-  echo "    Local:     http://127.0.0.1:${DEFAULT_PORT}"
-
-  LAN_ENTRIES=$(list_lan_ipv4)
-  if [[ -n "$LAN_ENTRIES" ]]; then
-    first_lan=1
-    while IFS= read -r entry; do
-      [[ -z "$entry" ]] && continue
-      ip=$(echo "$entry" | awk '{print $1}')
-      iface=$(echo "$entry" | awk '{print $2}')
-      if [[ "$first_lan" -eq 1 ]]; then
-        printf "    LAN:       %-22s ${DIM}(%s)${RESET}\n" "http://${ip}:${DEFAULT_PORT}" "$iface"
-        first_lan=0
-      else
-        printf "               %-22s ${DIM}(%s)${RESET}\n" "http://${ip}:${DEFAULT_PORT}" "$iface"
-      fi
-    done <<< "$LAN_ENTRIES"
-
-    echo ""
-    if [[ "$DAEMON_CONFIGURED" -eq 1 ]]; then
-      dim "The daemon binds to 127.0.0.1 only (no auth on the server yet)."
-      dim "To reach a LAN URL from another machine, either:"
-      dim "  • SSH tunnel (recommended):"
-      dim "      ssh -N -L ${DEFAULT_PORT}:127.0.0.1:${DEFAULT_PORT} you@this-mac"
-      dim "  • Or rebind the daemon to 0.0.0.0 (only on a trusted network):"
-      dim "      edit $DAEMON_PLIST (change --host 127.0.0.1 → 0.0.0.0) and reload:"
-      dim "      launchctl bootout gui/\$UID $DAEMON_PLIST && launchctl bootstrap gui/\$UID $DAEMON_PLIST"
-    else
-      dim "By default 'imsg serve' binds to 127.0.0.1 only. To expose on LAN:"
-      dim "  imsg serve --host 0.0.0.0 --port ${DEFAULT_PORT}"
-      dim "(No auth on the server yet — only do this on trusted networks.)"
-    fi
-  else
-    dim "No LAN interfaces detected."
-  fi
+  echo "    Local: http://127.0.0.1:${DEFAULT_PORT}"
+  echo ""
+  dim "From another device, use Tailscale Serve or an SSH tunnel:"
+  dim "  tailscale serve --bg ${DEFAULT_PORT}"
+  dim "  ssh -N -L ${DEFAULT_PORT}:127.0.0.1:${DEFAULT_PORT} you@this-mac"
 fi
 
 # ── Done ──────────────────────────────────────────────────────────────────────
@@ -563,9 +430,9 @@ if [[ "$(uname -s)" == "Darwin" ]]; then
   elif [[ "$DAEMON_CONFIGURED" -eq 1 ]]; then
     echo "    1. LaunchAgent is installed, but still needs permissions or a restart"
     echo "       grant Full Disk Access to: $IMSG_BIN"
-    echo "       then run: launchctl kickstart -k gui/\$UID/$DAEMON_LABEL"
+    echo "       then run: $IMSG_CMD service restart"
   else
-    echo "    1. Start the web app:  imsg serve --host 127.0.0.1 --port ${DEFAULT_PORT}"
+    echo "    1. Start the web app:  $IMSG_CMD serve --host 127.0.0.1 --port ${DEFAULT_PORT}"
   fi
   echo "    2. Open in browser:    http://127.0.0.1:${DEFAULT_PORT}"
   if [[ "$HAS_BUN" -eq 1 ]]; then
@@ -574,10 +441,10 @@ if [[ "$(uname -s)" == "Darwin" ]]; then
   if [[ "$DAEMON_CONFIGURED" -eq 1 ]]; then
     echo ""
     echo "  Daemon controls:"
-    echo "    Logs:      tail -f $DAEMON_LOG_DIR/imsg.log"
-    echo "    Restart:   launchctl kickstart -k gui/\$UID/$DAEMON_LABEL"
-    echo "    Stop:      launchctl bootout gui/\$UID/$DAEMON_LABEL"
-    echo "    Uninstall: launchctl bootout gui/\$UID/$DAEMON_LABEL && rm $DAEMON_PLIST"
+    echo "    Status:    $IMSG_CMD service status"
+    echo "    Restart:   $IMSG_CMD service restart"
+    echo "    Stop:      $IMSG_CMD service stop"
+    echo "    Logs:      $IMSG_CMD service logs -f"
   fi
 else
   echo "    1. Point at your Mac:  itui config set server=http://your-mac:${DEFAULT_PORT}"

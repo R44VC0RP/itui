@@ -381,7 +381,6 @@ export function useMessagesData({
     }
 
     const chatId = resolvedSelectedThreadId
-    fullMessageChatIdsRef.current.add(chatId)
     let cancelled = false
     setLoadingMessagesChatId(chatId)
 
@@ -390,22 +389,24 @@ export function useMessagesData({
         const nextMessages = await service.listMessages(chatId, 80)
 
         if (cancelled) {
+          fullMessageChatIdsRef.current.delete(chatId)
           return
         }
 
+        fullMessageChatIdsRef.current.add(chatId)
         reconcileLoadedMessages(chatId, nextMessages)
       } catch (error) {
-        if (cancelled) {
-          return
-        }
-
         fullMessageChatIdsRef.current.delete(chatId)
-        setLoadError(describeError(error))
+        if (!cancelled) {
+          setLoadError(describeError(error))
+        }
       } finally {
         if (!cancelled) {
           setLoadingMessagesChatId((current) =>
             current === chatId ? null : current
           )
+        } else {
+          fullMessageChatIdsRef.current.delete(chatId)
         }
       }
     })()
